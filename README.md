@@ -1,9 +1,12 @@
-# ap84SeasRF
 
-Cylc workflow for downscaling of the seasonal reforecast for the AP region using SKRIPS coupled model
+A Cylc workflow for downscaling of the seasonal reforecast for the AP region using SKRIPS coupled model
+
+## Work flow graph
+![graph](graph.png "Graph")
 
 
 ## Design rules
+
 
 ### The workflow should run out of the box
 Design the workflow so that the only external dependencies required are the large input datasets. All other components, including parameter files (e.g., namelists), scripts, utilities (e.g., CDO, NCO), and model code (e.g., WRF, MITgcm), should be installed and configured by the workflow itself. The dependency installation and configuration should be the initial step of the workflow. Every other task should depend on the successful completion of the dependency installation.
