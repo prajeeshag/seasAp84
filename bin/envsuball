@@ -1,0 +1,7 @@
+#!/bin/bash
+set -eu
+
+for i in "$@"; do
+  basei=$( basename $i )
+  envsub $i $basei
+done

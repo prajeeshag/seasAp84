@@ -1,0 +1,26 @@
+#!/bin/bash
+# shellcheck disable=SC2154
+set -e
+
+pyscript=$(dirname "$0")/mitgcm2nc.py
+export pyscript
+source "$(dirname "$0")/koi"
+koiname="$0"
+koidescription="Merge MITGCM Outputs in time and split over variables and write to compressed netcdf files"
+
+__koimain() {
+	__addarg "-h" "--help" "help" "optional" "" "$koidescription" ""
+	__addarg "" "--date" "storevalue" "required" "" "Reference date formated as yyyy-mm-dd:hh:mn:sc" ""
+	__addarg "" "--dt" "storevalue" "required" "" "Model timestep in seconds" ""
+	__addarg "" "prefixes" "positionalarray" "required" "" "prefixes of the mitgcm output files which needs to be processed" ""
+
+	__parseargs "$@"
+
+	set -u
+
+	for prefix in "${prefixes[@]}"; do
+		python "$pyscript" "$prefix" "$date" "$dt"
+	done
+}
+
+__koirun "$@"

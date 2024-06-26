@@ -1,0 +1,38 @@
+#!/bin/bash
+# shellcheck disable=SC2154
+
+set -e
+
+CDO=${CDO:-cdo}
+
+source "$(dirname "$0")/koi"
+
+koiname="$0"
+koidescription="Create a WPS compatible SFC file from ERA5 grib data"
+
+__koimain() {
+	__addarg "-h" "--help" "help" "optional" "" "$koidescription" ""
+	__addarg "-y" "--year" "storevalue" "required" "" "4-digit Year" ""
+	__addarg "-m" "--month" "storevalue" "required" "" "2-digit Month" ""
+	__addarg "-i" "--input" "storevalue" "required" "" "ERA5 input file path" ""
+	__addarg "-o" "--output" "storevalue" "required" "" "Output file path" ""
+
+	__parseargs "$@"
+
+	set -u
+
+	mkdir -p "$(dirname "$output")"
+
+	tmpfile=$(mktemp -p . --suffix=".grib")
+	$CDO -selyear,"${year}" -selmon,"${month}" "$input" "$tmpfile"
+	endHours=$((190 * 24))
+	optr="$tmpfile"
+	for i in $(seq 12 12 $endHours); do
+		tshift="${i}hour"
+		optr="$optr -shifttime,${tshift} $tmpfile"
+	done
+	$CDO -mergetime "$optr" "$output"
+	rm "$tmpfile"
+}
+
+__koirun "$@"

@@ -1,0 +1,71 @@
+#!/bin/bash
+# shellcheck disable=SC2154
+
+set -e
+
+MKMITGCMBC=${MKMITGCMBC:-mkMITgcmBC}
+MKMITGCMIC=${MKMITGCMIC:-mkMITgcmIC}
+
+source "$(dirname "$0")/koi"
+
+koiname="$0"
+koidescription="Create MITGCM ICBC from ECMWF SEAS5 netcdf files"
+
+__koimain() {
+	__addarg "-h" "--help" "help" "optional" "" "$koidescription" ""
+	__addarg "-i" "--input_dir" "storevalue" "required" "" "SEAS5 ocean file directory" ""
+	__addarg "" "--nx" "storevalue" "required" "" "NX of MITGCM grid" ""
+	__addarg "" "--ny" "storevalue" "required" "" "NY of MITGCM grid" ""
+	__addarg "" "--imask" "storevalue" "required" "" "Path to ocean mask file" ""
+
+	__parseargs "$@"
+
+	set -u
+
+	idir="$input_dir"
+	for item in vosaline:S votemper:T vomecrtn:V vozocrte:U; do
+		IFS=":" read -r prefix var <<<$item
+		files=$(find "$idir" -type f -name "${prefix}*")
+		count=$(echo "$files" | wc -w)
+		ifile=$files
+		if [ "$count" -eq 2 ]; then
+			dfiles=("${files}")
+			siz0=$(stat -c %s "${dfiles[0]}")
+			siz1=$(stat -c %s "${dfiles[1]}")
+			if ((siz1 > siz0)); then
+				ifile="${dfiles[0]}"
+			else
+				ifile="${dfiles[1]}"
+			fi
+		fi
+
+		#if a gz file unzip it
+		if [ "${ifile: -2}" == "gz" ]; then
+			cp "$ifile" .
+			ifile=$(basename "$ifile")
+			gunzip "$ifile"
+			ifile=${ifile:0:-3}
+		fi
+
+		if [ "$var" == 'T' ] || [ "$var" == 'S' ]; then
+			ifile="-ifthen $imask -selvar,${prefix} $ifile"
+		fi
+
+		$MKMITGCMBC \
+			--varnm "$prefix" \
+			--input "$ifile" \
+			--nx "$nx" \
+			--ny "$ny" \
+			--ovarnm "$var"
+
+		$MKMITGCMIC \
+			--varnm "$prefix" \
+			--input "$ifile" \
+			--nx "$nx" \
+			--ny "$ny" \
+			--ovarnm "$var"
+
+	done
+}
+
+__koirun "$@"

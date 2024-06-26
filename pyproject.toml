@@ -1,0 +1,4 @@
+[cylc-lint]                     # any of ['cylc-lint', 'cylclint', 'cylc_lint']
+  exclude = ['parm/cpld/namelist.rc']  # List of files to ignore
+  max-line-length = 130       # Max line length for linting
+
