@@ -1,10 +1,6 @@
 
 A Cylc workflow for downscaling of the seasonal reforecast for the AP region using SKRIPS coupled model
 
-## Work flow graph
-![graph](graph.png "Graph")
-
-
 ## Design rules
 
 
@@ -32,3 +28,7 @@ For more information on writing workflows see the
 
 There is also a
 [workflow design guide](https://cylc.github.io/cylc-doc/stable/html/workflow-design-guide/index.html).
+
+## Work flow graph
+![graph](graph.png "Graph")
+
