@@ -1,0 +1,19 @@
+
+StartYear:      $syyyy
+StartMonth:     $smm
+StartDay:       $sdd
+StartHour:      $shh
+StartMinute:    00
+StartSecond:    00
+
+StopYear:        $eyyyy
+StopMonth:       $emm
+StopDay:         $edd
+StopHour:        $ehh
+StopMinute:      00
+StopSecond:      00
+
+EsmStepSeconds: $cpldDt
+ATMStepSeconds: $atmDt
+OCNStepSeconds: $ocnDt
+

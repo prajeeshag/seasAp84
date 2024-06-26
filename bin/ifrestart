@@ -1,0 +1,3 @@
+#!/bin/bash
+set -eu
+[[ "$CYLC_TASK_CYCLE_POINT" == "$CYLC_WORKFLOW_INITIAL_CYCLE_POINT" ]] &&  echo ".false." || echo ".true."

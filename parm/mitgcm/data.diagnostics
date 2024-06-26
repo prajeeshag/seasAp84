@@ -1,0 +1,25 @@
+# Diagnostic Package Choices
+#-----------------
+# for each output-stream:
+#  filename(n) : prefix of the output file name (only 8.c long) for outp.stream n
+#  frequency(n):< 0 : write snap-shot output every |frequency| seconds
+#               > 0 : write time-average output every frequency seconds
+#  timePhase(n)     : write at time = timePhase + multiple of |frequency|
+#  levels(:,n) : list of levels to write to file (Notes: declared as REAL)
+#                 when this entry is missing, select all common levels of this list
+#  fields(:,n) : list of diagnostics fields (8.c) (see "available_diagnostics.log"
+#                 file for the list of all available diag. in this particular config)
+#-----------------
+ &diagnostics_list
+  frequency(1) = $ocn2dFreq,
+  fields(1:4,1) = 'MXLDEPTH', 'ETAN', 'THETA', 'SALT',
+  filename(1) = 'ocn2d',
+  levels(1,1) = 1. 
+
+  frequency(2) = $ocn3dFreq,
+  fields(1:,2) = 'THETA', 'SALT', 'UVEL', 'VVEL', 'WVEL',
+  filename(2) = 'ocn3d',
+ &
+
+ &DIAG_STATIS_PARMS
+ &

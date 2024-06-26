@@ -1,0 +1,137 @@
+#!jinja2
+
+{% set cpuPerNode=192 %}
+{% set nio_groups=6 %}
+{% set nio_tasks_per_group=8 %}
+{% set nproc_x=40 %}
+{% set nproc_y=38 %}
+
+{% set cpuATM = nio_groups * nio_tasks_per_group + nproc_x * nproc_y  %}
+
+[scheduling]
+    [[graph]]
+        R1 = """
+            installMambaPkgs => installDone
+        """
+        P1M = """
+            installDone[^] => cpSEAS5Atm
+            cpSEAS5Atm => getAtmInput<mem>
+        """
+
+[runtime]
+
+    [[root]]
+        init-script = """
+            export PATH="/scratch/athippp/iops/micromamba/envs/ap84SeasRF/bin:$PATH"
+        """
+        [[[environment]]]
+            DATA_DIR="/project/k10035/athippp/DATA"
+
+    [[installMambaPkgs]]
+        script=" micromamba create -f $PARM_DIR/env.yaml -y "
+
+    [[getSKRIPSsrc]]
+        post-script = "cd $SKRIPS_DIR; ./compile.sh set_machine shaheen3_intel"
+
+    [[cpSEAS5Atm]]
+        script = "rsync -av $input_dir/seas5_mena_*.grib . $CYCLE_DIR"
+        execution time limit = PT30M
+        [[[environment]]]
+            yyyy=${CYLC_TASK_CYCLE_POINT:0:4}
+            mm=${CYLC_TASK_CYCLE_POINT:4:2}
+            input_dir="$DATA_DIR/ECMWF/SEAS5/ATM/pl/${yyyy}${mm}01T0000Z"
+
+    [[getSfcInput]]
+        execution time limit = PT30M
+        [[[environment]]]
+            input=$DATA_DIR/ERA5/ForSeas/era5_Mena_sfc_2009-2023.grib
+
+    [[GET_ATM_INPUT]]
+        execution time limit = PT30M
+        [[[environment]]]
+            input_dir=$CYCLE_DIR
+
+    [[MK_OCN_ICBC]]
+        execution time limit = PT30M
+        [[[environment]]]
+            yyyy=${CYLC_TASK_CYCLE_POINT:0:4}
+            mm=${CYLC_TASK_CYCLE_POINT:4:2}
+            seas5_ocn_mask=$DATA_DIR/ECMWF/SEAS5/OCN/ocn_mask.nc
+            memN0=$((memN-1))
+            input_dir=$DATA_DIR/ECMWF/SEAS5/OCN/longrange${memN0}/archive_r1x1/${yyyy}${mm}0100
+
+    [[UNGRIB]]
+        execution time limit = PT1H
+
+    [[METGRID]]
+        execution time limit = PT1H
+
+    [[REAL]]
+        execution time limit = PT3H
+        [[[environment]]]
+            run_cmd = "srun -n {{ cpuPerNode }}"
+
+    [[MITGCM_BAL]]
+        execution time limit = PT1H
+        platform=shaheen
+        [[[directives]]]
+            --account=k10035
+            {% set nodes = (cpuOCN + cpuPerNode - 1) // cpuPerNode %}
+            --nodes={{ nodes }}
+            --ntasks={{ cpuOCN }}
+            --partition=workq
+        [[[environment]]]
+            run_cmd = "srun -n {{ cpuOCN }} --distribution=block:block --hint=nomultithread"
+
+    [[SKRIPS]]
+        execution time limit = PT13H
+        platform=shaheen
+        {% set cpuTotal=cpuATM+cpuOCN %}
+        [[[directives]]]
+            --account=k10035
+            {% set nodes = (cpuTotal + cpuPerNode - 1) // cpuPerNode %}
+            --nodes={{ nodes }}
+            --ntasks={{ cpuTotal }}
+            --partition=workq
+        [[[environment]]]
+            FI_CXI_RX_MATCH_MODE=hybrid
+            run_cmd = "srun -n {{ cpuTotal }} --distribution=block:block --hint=nomultithread"
+            nio_groups={{ nio_groups }}
+            nio_tasks_per_group={{ nio_tasks_per_group }}
+            nproc_x={{ nproc_x }}
+            nproc_y={{ nproc_y }}
+            cpuATM={{ cpuATM }}
+
+    [[UPP]]
+        execution time limit = PT10H
+        [[[environment]]]
+            run_cmd = "srun --exclusive --mem-per-cpu=2G --ntasks=16 "
+            max_par_jobs=10
+
+# Set Enviornment
+
+    [[UNGRIB, METGRID, REAL, SKRIPS, UPP, MITGCM_BAL]]
+        env-script = """
+            module swap PrgEnv-cray PrgEnv-intel/8.4.0
+            module load cray-netcdf
+            module load cray-parallel-netcdf
+        """
+
+# Platform settings
+    [[REAL, UPP]]
+        platform=shaheen
+        [[[directives]]]
+            --account=k10035
+            --nodes = 1
+            --partition=workq
+
+    [[getSfcInput, GET_ATM_INPUT, MK_OCN_ICBC, UNGRIB, METGRID, MITGCM2NC]]
+        platform=shaheen
+        [[[directives]]]
+            --account=k10035
+            --nodes = 1
+            --ntasks = 1
+            --partition=shared
+            --mem=8G
+
+

@@ -1,0 +1,56 @@
+#
+# ***************
+# Open boundaries
+# ***************
+ &OBCS_PARM01
+ OB_Jnorth=   800*0,
+ OB_Jsouth=   800*1,
+ OB_Iwest=    780*1,
+ OB_Ieast=    780*-1,
+#
+ useOrlanskiNorth=.FALSE.,
+ useOBCSsponge=.TRUE.,
+ useOBCSbalance=.TRUE.,
+ useOBCSprescribe=.TRUE.,
+ OBCS_balanceFacW=-1,
+ OBCS_balanceFacE=1,
+ OBCS_balanceFacS=1,
+#
+# OBNuFile='OBNuFile.bin',
+# OBNvFile='OBNvFile.bin',
+# OBNtFile='OBNtFile.bin',
+# OBNsFile='OBNsFile.bin',
+#
+ OBSuFile='obS_U.bin',
+ OBSvFile='obS_V.bin',
+ OBStFile='obS_T.bin',
+ OBSsFile='obS_S.bin',
+#
+ OBWuFile='obW_U.bin',
+ OBWvFile='obW_V.bin',
+ OBWtFile='obW_T.bin',
+ OBWsFile='obW_S.bin',
+#
+ OBEuFile='obE_U.bin',
+ OBEvFile='obE_V.bin',
+ OBEtFile='obE_T.bin',
+ OBEsFile='obE_S.bin',
+ &
+
+# *****************************************
+# Orlanski Boundary Condition Parameters.
+# *****************************************
+ &OBCS_PARM02
+# cvelTimeScale = 2000.,
+ &
+# *****************************************
+# Sponge Layer Parameters.
+# *****************************************
+ &OBCS_PARM03
+ Urelaxobcsinner=864000.E0,
+ Urelaxobcsbound=43200.E0,
+ Vrelaxobcsinner=864000.E0,
+ Vrelaxobcsbound=43200.E0,
+ spongeThickness=3,
+ &
+

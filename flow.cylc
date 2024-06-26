@@ -1,0 +1,330 @@
+#!Jinja2
+
+
+{% if SITE is not defined %}
+    {% from 'site.cylc' import SITE %}
+{% endif %}
+{% from 'param.cylc' import atmDt, ocnDt, cpldDt, cpuOCN, ocnDtBal %}
+{% from 'param.cylc' import FCSTDURATION, RUNDURATION_BAL, NMEMBERS %}
+{% from 'param.cylc' import initialCyclePoint, finalCyclePoint %}
+
+{% if graph is defined %}
+    # For cylc graph set NMEMBERS = 2
+    {% set NMEMBERS=2 %}
+{% endif %}
+
+[task parameters]
+    mem = 1..{{ NMEMBERS }}
+
+[scheduling]
+    initial cycle point = {{ initialCyclePoint }}
+    final cycle point = {{ finalCyclePoint }}
+    [[graph]]
+        R1 = """
+            getSKRIPSsrc => bldWRF & bldESMF & bldMITGCM & bldUPP
+            bldWRF & bldESMF & bldMITGCM => bldSKRIPS
+            bldWRF => bldWPS
+            bldSKRIPS & bldWPS & bldUPP => installDone
+        """
+
+        P1M = """
+            installDone[^] => getAtmInput<mem> & getSfcInput & mkOcnICBC<mem>
+            mkOcnICBC<mem> => mitgcmBal<mem>
+            getAtmInput<mem>:done & getSfcInput => ungrib<mem>
+            ungrib<mem> => metgrid<mem>
+            metgrid<mem> => real<mem>
+            mitgcmBal<mem> & real<mem> => skrips<mem>
+            skrips<mem> => upp<mem>
+            skrips<mem> => mitgcm2nc<mem>
+        """
+
+[runtime]
+    [[root]]
+        ## Keep the runtime.root to as minimal as possible
+        execution retry delays = PT2M
+        [[[environment]]]
+            SKRIPS_DIR=${CYLC_WORKFLOW_SHARE_DIR}/SKRIPS
+            SKRIPS_BUILD_NAME=AP4km
+            CYCLE_DIR=${CYLC_WORKFLOW_WORK_DIR}/${CYLC_TASK_CYCLE_POINT}
+            SHARE_DIR=${CYCLE_DIR}/share
+            PARM_DIR=${CYLC_WORKFLOW_RUN_DIR}/parm
+            FIX_DIR=${CYLC_WORKFLOW_RUN_DIR}/fix
+            FCST_END_TIME=$(isodatetime ${CYLC_TASK_CYCLE_POINT} --offset={{ FCSTDURATION }})
+            syyyy=${CYLC_TASK_CYCLE_POINT:0:4}
+            smm=${CYLC_TASK_CYCLE_POINT:4:2}
+            sdd=${CYLC_TASK_CYCLE_POINT:6:2}
+            shh=${CYLC_TASK_CYCLE_POINT:9:2}
+            eyyyy=${FCST_END_TIME:0:4}
+            emm=${FCST_END_TIME:4:2}
+            edd=${FCST_END_TIME:6:2}
+            ehh=${FCST_END_TIME:9:2}
+
+    [[getSKRIPSsrc]]
+        script="""
+            mkdir -p $SKRIPS_DIR
+            cd $SKRIPS_DIR
+            git clone --recursive --depth 1 --branch forSeas https://github.com/prajeeshag/SKRIPS.git .
+            rm -rf .git
+        """
+        post-script=" echo 'set the site specific env file using command ./compile.sh set_machine' && exit 1 "
+
+    [[bldESMF]]
+        script="cd $SKRIPS_DIR; ./compile.sh esmf"
+
+    [[bldWRF]]
+        script="cd $SKRIPS_DIR; ./compile.sh wrf"
+
+    [[bldMITGCM]]
+        script="""
+            cd $SKRIPS_DIR
+            ./compile.sh mitgcm --code examples/$SKRIPS_BUILD_NAME/code_{{ cpuOCN }} --exe $SKRIPS_BUILD_NAME
+        """
+
+    [[bldSKRIPS]]
+        script="""
+            cd $SKRIPS_DIR
+            ./compile.sh skrips --exe build/$SKRIPS_BUILD_NAME/{{ cpuOCN }}
+        """
+
+    [[bldWPS]]
+        script="cd $SKRIPS_DIR; ./compile.sh wps"
+
+    [[bldUPP]]
+        script="cd $SKRIPS_DIR; ./compile.sh upp"
+
+    [[installMambaPkgs]]
+        script=" $MAMBACMD create -f $PARM_DIR/env.yaml -y "
+
+    [[installDone]]
+        # Empty task to ensure all compilation is completed
+
+    [[ENSMEMBER]]
+        [[[environment]]]
+            memN=$CYLC_TASK_PARAM_mem
+            MEM_SHARE_DIR=${SHARE_DIR}/mem${CYLC_TASK_PARAM_mem}
+            OUTDIR=$MEM_SHARE_DIR/archive/outputs
+
+    [[WRF]]
+        [[[environment]]]
+            nproc_x=-1
+            nproc_y=-1
+            time_step={{atmDt}}
+            wrf3dFreq=21600 # 6 hourly
+            wrf2dFreq=3600 # hourly
+            restart='.false.'
+            restart_interval=$(isodatetime --as-total=m {{ FCSTDURATION }} )
+
+    [[MITGCM]]
+        [[[environment]]]
+            ocn_nx=800
+            ocn_ny=780
+            endTime=$(isodatetime --as-total=s {{ FCSTDURATION }} )
+            deltaT={{ ocnDt }}
+            ocn2dFreq=86400 # daily
+            ocn3dFreq=432000 # 5 day
+            cpuOCN={{ cpuOCN }}
+            pickupSuff="' '"
+
+    [[getSfcInput]]
+        script = "getSfcInput -y $yyyy -m $mm -i $input -o $SHARE_DIR/sfc.grib"
+        [[[environment]]]
+            yyyy=${CYLC_TASK_CYCLE_POINT:0:4}
+            mm=${CYLC_TASK_CYCLE_POINT:4:2}
+            # input= site specific: path to input
+
+    [[GET_ATM_INPUT]]
+        script = """
+            getAtmInput -i $input_dir -o $MEM_SHARE_DIR/atmPrs.grib -m $memN --nrecords $nrecords
+
+            # task sometime exit with error even after successful completion
+            # done output is used to trigger the dependecies to bypass this problem
+            cylc message -- "${CYLC_WORKFLOW_ID}" "${CYLC_TASK_JOB}" "done"
+        """
+        execution retry delays = PT2M, 2*PT5M # grib_filter is unstable
+        [[[outputs]]]
+            done = "done"
+        [[[environment]]]
+            # memN from inheritance
+            nrecords=7680
+            # input_dir= site specific: path to input_directory
+
+    [[getAtmInput<mem>]]
+        inherit = GET_ATM_INPUT, ENSMEMBER
+
+    [[MK_OCN_ICBC]]
+        inherit = None, MITGCM
+        pre-script = """
+            rm -rf *
+            envsub $PARM_DIR/mitgcm/data data
+            ln_safe $FIX_DIR/bathymetry.bin .
+            ln_safe $FIX_DIR/tile001.mitgrid .
+        """
+        script = "mkOcnICBC -i $input_dir --nx $ocn_nx --ny $ocn_ny --imask $seas5_ocn_mask"
+        post-script = "mv ob*.bin *_ini.bin $MEM_SHARE_DIR"
+        [[[environment]]]
+            #seas5_ocn_mask
+            #input_dir
+
+    [[mkOcnICBC<mem>]]
+        inherit = MK_OCN_ICBC, ENSMEMBER
+
+    [[UNGRIB]]
+        pre-script = """
+            rm -rf *
+            ln_safe $MEM_SHARE_DIR/atmPrs.grib .
+            ln_safe $SHARE_DIR/sfc.grib .
+            envsub $PARM_DIR/wps/namelist.wps namelist.wps
+            envsub $PARM_DIR/wps/Vtable Vtable
+            ln_safe "$ungrib_dir" .
+            $link_grib ./*.grib
+        """
+        script = """
+            ./ungrib/ungrib.exe
+            grep "Successful completion" ungrib.log
+        """
+        post-script = "mv FILE* $MEM_SHARE_DIR"
+        [[[environment]]]
+            ungrib_dir=$SKRIPS_DIR/external/WPS/ungrib
+            link_grib=$SKRIPS_DIR/external/WPS/link_grib.csh
+
+    [[ungrib<mem>]]
+        inherit = UNGRIB, ENSMEMBER
+
+    [[METGRID]]
+        pre-script = """
+            rm -rf *
+            ln -sf $MEM_SHARE_DIR/FILE* .
+            envsub $PARM_DIR/wps/namelist.wps namelist.wps
+            ln_safe $metgrid_dir .
+            ln_safe $FIX_DIR/geo_em.d01.nc geo_em.d01.nc
+        """
+        script = """
+            ./metgrid/metgrid.exe
+            grep "Successful completion" metgrid.log
+        """
+        post-script = "mv met_em* $MEM_SHARE_DIR"
+        [[[environment]]]
+            metgrid_dir=$SKRIPS_DIR/external/WPS/metgrid
+
+    [[metgrid<mem>]]
+        inherit = METGRID, ENSMEMBER
+
+    [[REAL]]
+        inherit = None, WRF
+        pre-script = """
+            rm -rf *
+            ln -sf $MEM_SHARE_DIR/met_em* .
+            envsuball $PARM_DIR/wrf/*
+        """
+        script = "$run_cmd $real_exe"
+        post-script = "mv wrf*_d?? $MEM_SHARE_DIR"
+
+        [[[environment]]]
+            nproc_x=-1
+            nproc_y=-1
+            nio_groups=0
+            nio_tasks_per_group=0
+            real_exe=$SKRIPS_DIR/external/WRF/main/real.exe
+            #run_cmd = site specific run command: e.g. mpirun -n 4
+
+    [[real<mem>]]
+        inherit = REAL, ENSMEMBER
+
+    [[MITGCM_BAL]]
+        inherit = None, MITGCM
+        pre-script="""
+            rm -rf *
+            ln -sf $MEM_SHARE_DIR/ob*.bin .
+            ln -sf $MEM_SHARE_DIR/*_ini.bin .
+            ln_safe $FIX_DIR/bathymetry.bin .
+            ln_safe $FIX_DIR/tile001.mitgrid .
+            envsuball $PARM_DIR/mitgcm/*
+        """
+        script = "$run_cmd $mitgcm_exe"
+        post-script="mv pickup.ckptA.* $MEM_SHARE_DIR"
+        [[[environment]]]
+            mitgcm_exe=$SKRIPS_DIR/build/${SKRIPS_BUILD_NAME}/${cpuOCN}/mitgcm/mitgcmuv
+            endTime=$(isodatetime --as-total=s {{ RUNDURATION_BAL }} )
+            deltaT={{ ocnDtBal }}
+            ocn2dFreq=86400000 # no output
+            ocn3dFreq=43200000 # no output
+            #run_cmd = site specific run command: e.g. mpirun -n 4
+
+    [[mitgcmBal<mem>]]
+        inherit = MITGCM_BAL, ENSMEMBER
+
+    [[SKRIPS]]
+        inherit = None, MITGCM, WRF
+        pre-script = """
+            rm -rf *
+            cp $MEM_SHARE_DIR/pickup.ckptA.* .
+            ln -sf $MEM_SHARE_DIR/*.bin .
+            ln -sf $MEM_SHARE_DIR/wrf*_d?? .
+            cp -f $em_real_dir/* .
+            ln_safe $FIX_DIR/bathymetry.bin .
+            ln_safe $FIX_DIR/geo_em.d01.nc .
+            ln_safe $FIX_DIR/tile001.mitgrid .
+            envsuball $PARM_DIR/wrf/*
+            envsuball $PARM_DIR/mitgcm/*
+            envsuball $PARM_DIR/cpld/*
+        """
+
+        script = "$run_cmd $skrips_exe"
+
+        post-script = """
+            rm pickup.ckptA.*
+            mv *_d??_????-??-??_* $MEM_SHARE_DIR
+            mv *.data *.meta *.log $MEM_SHARE_DIR
+        """
+        [[[environment]]]
+            cpldDt={{ cpldDt }}
+            atmDt={{ atmDt }}
+            ocnDt={{ ocnDt }}
+            pickupSuff="ckptA"
+            em_real_dir=$SKRIPS_DIR/external/WRF/test/em_real
+            skrips_exe=$SKRIPS_DIR/build/${SKRIPS_BUILD_NAME}/${cpuOCN}/main/skrips.exe
+            #run_cmd = site specific run command: e.g. mpirun -n 4
+            #cpuATM = site specific
+            cpuOCN = {{ cpuOCN }}
+
+    [[skrips<mem>]]
+        inherit = SKRIPS, ENSMEMBER
+
+    [[UPP]]
+        pre-script = "ln -sf $MEM_SHARE_DIR/wrf?d_d??_????-??-??_* ."
+        script = "upp.sh $prefixes"
+        post-script = """
+            mkdir -p $OUTDIR
+            mv *.grb2 $OUTDIR
+        """
+        [[[environment]]]
+            # run_cmd = site specific run command: e.g. "srun --exclusive --mem-per-cpu=2G --ntasks=16 "
+            # max_par_jobs=10
+            prefixes="wrf2d wrf3d"
+
+    [[upp<mem>]]
+        inherit = UPP, ENSMEMBER
+
+    [[MITGCM2NC]]
+        inherit = None, MITGCM
+        pre-script = """
+            ln -sf $MEM_SHARE_DIR/*.data .
+            ln -sf $MEM_SHARE_DIR/*.meta .
+            ln_safe $MEM_SHARE_DIR/available_diagnostics.log .
+        """
+
+        script = "mitgcm2nc --date $date --dt $deltaT $prefixes"
+
+        post-script = """
+            mkdir -p $OUTDIR
+            mv *.nc $OUTDIR
+        """
+        [[[environment]]]
+            date="${syyyy}-${smm}-${sdd}:${shh}:00:00"
+            prefixes="ocn2d ocn3d"
+
+    [[mitgcm2nc<mem>]]
+        inherit = MITGCM2NC, ENSMEMBER
+
+
+{% include 'include/' ~ SITE ~ '/flow.cylc' %}
