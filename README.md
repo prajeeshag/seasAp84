@@ -1,6 +1,17 @@
 
 # Cylc Workflow for Downscaling Seasonal Reforecast for AP Region Using SKRIPS Coupled Model
 
+
+## Directory Structure
+- flow.cylc
+- params.cylc
+- **include**
+- **fix**
+- **parm**
+- **bin**
+
+
+
 ## Design Principles
 
 ### Workflow Independence
