@@ -1,27 +1,44 @@
 
-A Cylc workflow for downscaling of the seasonal reforecast for the AP region using SKRIPS coupled model
+# Cylc Workflow for Downscaling Seasonal Reforecast for AP Region Using SKRIPS Coupled Model
 
-## Design rules
+## Design Principles
 
+### Workflow Independence
+- The workflow should function out-of-the-box, requiring only large input datasets as external dependencies.
+- All other components (parameter files, scripts, utilities, model code) should be installed and configured by the workflow itself.
+- Dependency installation and configuration should be the initial step.
+- Subsequent tasks should depend on the successful completion of dependency installation.
 
-### The workflow should run out of the box
-Design the workflow so that the only external dependencies required are the large input datasets. All other components, including parameter files (e.g., namelists), scripts, utilities (e.g., CDO, NCO), and model code (e.g., WRF, MITgcm), should be installed and configured by the workflow itself. The dependency installation and configuration should be the initial step of the workflow. Every other task should depend on the successful completion of the dependency installation.
+## `flow.cylc` Structure
 
-### A clean and portable `flow.cylc`
-- Define each dependency (=>) on a separate line in the `[[graph]]` section.
-- Avoid including site-specific details in the main flow.cylc file. Instead, use Jinja2 include files for site-specific configurations.
-- Do not use inheritance in site include files to prevent overriding any inheritance defined in the main flow.cylc.
-- Keep the [runtime][root] section minimal.
-- Minimize the use of Jinja2. Prefer task parameterization.
-- Use `pre-script` for setting up the run directory and any pre-job configurations, such as editing namelists, and copying or linking necessary input and forcing files.
-- Use `script` for the command that launches the actual job (e.g., mpirun -np3 wrf.exe).
-- Use `post-script` for any post-run tasks, such as moving the outputs.
-- Ensure that pre-script, script, and post-script are site-agnostic.
-- The parallel job launching command in the script will be site-specific. Provide this through the site include file by setting `[[[environment]]] run_cmd` for the applicable tasks.
-- Use env-script for site-specific environment loading commands (e.g., module load, mamba activate). Note: The variables defined in `[[[environment]]]` are not visible in env-script, as env-script is invoked before `[[[environment]]]`.
-- Use the `cylc lint` to check the Cylc code style.
+### General Guidelines
+- Use four <space> indentations in `flow.cylc` file. Do not use <tabs>.
+- Define each dependency on a separate line in the `[[graph]]` section.
+- Avoid including site-specific details in the main `flow.cylc` file.
+- Use Jinja2 include files for site-specific configurations.
+    - For e.g. A site include file `include/<SITE>/flow.cylc` is included at the end of main `flow.cylc` as:
+    ```
+        {% include 'include/' ~ SITE ~ '/flow.cylc' %}
+
+    ```
+- Do not use inheritance in site include files to prevent overriding any inheritance defined in the main `flow.cylc`.
+- Keep the `[runtime][root]` section minimal.
+- Minimize the use of Jinja2; prefer task parameterization.
+
+### Task Scripts
+- **pre-script**: Set up the run directory and perform pre-job configurations (e.g., editing namelists, copying/linking necessary input and forcing files).
+- **script**: Launch the actual job (e.g., `mpirun -np 4 wrf.exe`).
+- **post-script**: Perform post-run tasks (e.g., moving the outputs).
+- Ensure pre-script, script, and post-script are site-agnostic.
+- The parallel job launching command (e.g. `mpirun -np 4`) in the script will be site-specific. Provide this through the site include file by setting `[[[environment]]] run_cmd` for the applicable tasks.
+- **env-script**: Include site-specific environment loading commands (e.g., `module load`, `mamba activate`).
+  - Note: Variables defined in `[[[environment]]]` are not visible in env-script, as env-script is invoked before `[[[environment]]]`.
+
+## Code Quality and Style
+- Use `cylc lint` to check the Cylc code style.
 - Use `shfmt` for formatting bash scripts.
-- Use the `black` formatter for Python codes.
+- Use the `black` formatter for Python code.
+
 
 For more information on writing workflows see the
 [user guide](https://cylc.github.io/cylc-doc/stable/html/user-guide/writing-workflows/index.html).

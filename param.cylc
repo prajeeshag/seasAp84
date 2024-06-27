@@ -1,4 +1,4 @@
-{% set FCSTDURATION = 'P186D' %}
+{% set FCSTDURATION = 'P185D' %}
 {% set RUNDURATION_BAL = 'P1D' %}
 {% set initialCyclePoint = '2009-01-02' %}
 {% set finalCyclePoint = '2009-01-02' %}
