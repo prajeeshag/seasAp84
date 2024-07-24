@@ -1,0 +1,2 @@
+
+{% set ARCHIVE_ROOT = '/scratch/athippp/cylc-archive' %}
