@@ -9,49 +9,49 @@ koiname=$0
 koidescription="Run UPP"
 
 function __koimain {
-	__addarg "-h" "--help" "help" "optional" "" "$koidescription" ""
-	__addarg "-u" "--uppdir" "storevalue" "required" "" "Path to UPP root directory" ""
-	__addarg "-c" "--ctlfile" "storevalue" "required" "" "UPP Post cntrl text file" ""
-	__addarg "-i" "--ifile" "storevalue" "required" "" "WRF output file" ""
-	__addarg "-r" "--runcmd" "storevalue" "required" "" "run command e.g. 'srun -n 16' " ""
-	__parseargs "$@"
+    __addarg "-h" "--help" "help" "optional" "" "$koidescription" ""
+    __addarg "-u" "--uppdir" "storevalue" "required" "" "Path to UPP root directory" ""
+    __addarg "-c" "--ctlfile" "storevalue" "required" "" "UPP Post cntrl text file" ""
+    __addarg "-i" "--ifile" "storevalue" "required" "" "WRF output file" ""
+    __addarg "-r" "--runcmd" "storevalue" "required" "" "run command e.g. 'srun -n 16' " ""
+    __parseargs "$@"
 
-	pdir=$(pwd)
-	mkdir -p tmp/
-	workdir=$(mktemp -d tmp/tmp.XXXXXXX)
-	ffile=$(realpath "$ifile")
+    pdir=$(pwd)
+    mkdir -p tmp/
+    workdir=$(mktemp -d tmp/tmp.XXXXXXX)
+    ffile=$(realpath "$ifile")
 
-	cd "$workdir"
+    cd "$workdir"
 
-	crtmdir="$uppdir"/src/lib/crtm2/src/fix
+    crtmdir="$uppdir"/src/lib/crtm2/src/fix
 
-	ln -fs "$uppdir"/parm/post_avblflds.xml post_avblflds.xml
-	ln -fs "$uppdir"/src/lib/g2tmpl/params_grib2_tbl_new params_grib2_tbl_new
-	ln -fs "$uppdir"/parm/nam_micro_lookup.dat .
-	ln -fs "$uppdir"/parm/hires_micro_lookup.dat .
+    ln -fs "$uppdir"/parm/post_avblflds.xml post_avblflds.xml
+    ln -fs "$uppdir"/src/lib/g2tmpl/params_grib2_tbl_new params_grib2_tbl_new
+    ln -fs "$uppdir"/parm/nam_micro_lookup.dat .
+    ln -fs "$uppdir"/parm/hires_micro_lookup.dat .
 
-	ln -fs "$crtmdir"/EmisCoeff/IR_Water/Big_Endian/* .
+    ln -fs "$crtmdir"/EmisCoeff/IR_Water/Big_Endian/* .
 
-	ln -fs "$crtmdir"/EmisCoeff/IR_Land/SEcategory/Big_Endian/* .
+    ln -fs "$crtmdir"/EmisCoeff/IR_Land/SEcategory/Big_Endian/* .
 
-	ln -fs "$crtmdir"/AerosolCoeff/Big_Endian/AerosolCoeff.bin ./
-	ln -fs "$crtmdir"/CloudCoeff/Big_Endian/CloudCoeff.bin ./
+    ln -fs "$crtmdir"/AerosolCoeff/Big_Endian/AerosolCoeff.bin ./
+    ln -fs "$crtmdir"/CloudCoeff/Big_Endian/CloudCoeff.bin ./
 
-	ln -fs "$crtmdir"/SpcCoeff/Big_Endian/* .
-	ln -fs "$crtmdir"/TauCoeff/ODPS/Big_Endian/* .
+    ln -fs "$crtmdir"/SpcCoeff/Big_Endian/* .
+    ln -fs "$crtmdir"/TauCoeff/ODPS/Big_Endian/* .
 
-	ln -fs "${ctlfile}" postxconfig-NT.txt
+    ln -fs "${ctlfile}" postxconfig-NT.txt
 
-	sc=$(echo "$ffile" | rev | cut -c1-2 | rev)
-	mn=$(echo "$ffile" | rev | cut -c4-5 | rev)
-	hr=$(echo "$ffile" | rev | cut -c7-8 | rev)
-	dd=$(echo "$ffile" | rev | cut -c10-11 | rev)
-	mm=$(echo "$ffile" | rev | cut -c13-14 | rev)
-	yyyy=$(echo "$ffile" | rev | cut -c16-19 | rev)
-	dateStamp=${yyyy}-${mm}-${dd}T${hr}:${mn}:${sc}
-	dateStamp1=${yyyy}_${mm}_${dd}_${hr}_${mn}_${sc}
+    sc=$(echo "$ffile" | rev | cut -c1-2 | rev)
+    mn=$(echo "$ffile" | rev | cut -c4-5 | rev)
+    hr=$(echo "$ffile" | rev | cut -c7-8 | rev)
+    dd=$(echo "$ffile" | rev | cut -c10-11 | rev)
+    mm=$(echo "$ffile" | rev | cut -c13-14 | rev)
+    yyyy=$(echo "$ffile" | rev | cut -c16-19 | rev)
+    dateStamp=${yyyy}-${mm}-${dd}T${hr}:${mn}:${sc}
+    dateStamp1=${yyyy}_${mm}_${dd}_${hr}_${mn}_${sc}
 
-	cat <<EOF >itag
+    cat <<EOF >itag
 $ffile
 netcdf
 grib2
@@ -59,13 +59,13 @@ $dateStamp
 NCAR
 EOF
 
-	oprefix=$(head -n 3 "$ctlfile" | tail -n 1)
+    oprefix=$(head -n 3 "$ctlfile" | tail -n 1)
 
-	eval "$runcmd $uppdir/bin/unipost.exe > upp.log 2>&1 "
-	ofile=${oprefix}_${dateStamp1}.grib2
-	mv "$oprefix"* "$pdir/$ofile"
-	echo "UPP: $ffile => $ofile done"
-	cd "$pdir" && rm -rf workdir # remove Huge files
+    eval "$runcmd $uppdir/bin/unipost.exe > upp.log 2>&1 "
+    ofile=${oprefix}_${dateStamp1}.grib2
+    mv "$oprefix"* "$pdir/$ofile"
+    echo "UPP: $ffile => $ofile done"
+    cd "$pdir" && rm -rf "$workdir" # remove Huge files
 }
 
 __koirun "$@"
