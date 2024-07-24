@@ -4,6 +4,7 @@
 {% if SITE is not defined %}
     {% from 'site.cylc' import SITE %}
 {% endif %}
+{% from 'include/' ~ SITE ~ '/param.cylc' import ARCHIVE_ROOT %}
 {% from 'param.cylc' import atmDt, ocnDt, cpldDt, cpuOCN, ocnDtBal %}
 {% from 'param.cylc' import FCSTDURATION, RUNDURATION_BAL, NMEMBERS %}
 {% from 'param.cylc' import initialCyclePoint, finalCyclePoint %}
@@ -36,6 +37,9 @@
             mitgcmBal<mem> & real<mem> => skrips<mem>
             skrips<mem> => upp<mem>
             skrips<mem> => mitgcm2nc<mem>
+            upp<mem> => archive<mem>
+            mitgcm2nc<mem> => archive<mem>
+            archive<mem> => cleanUp<mem>
         """
 
 [runtime]
@@ -46,9 +50,11 @@
             SKRIPS_DIR=${CYLC_WORKFLOW_SHARE_DIR}/SKRIPS
             SKRIPS_BUILD_NAME=AP4km
             CYCLE_DIR=${CYLC_WORKFLOW_WORK_DIR}/${CYLC_TASK_CYCLE_POINT}
-            SHARE_DIR=${CYCLE_DIR}/share
+            SHARE_DIR=${CYCLE_DIR}/share # TODO Shouldn't be inside work, move it WORKFLOW_SHARE_DIR
             PARM_DIR=${CYLC_WORKFLOW_RUN_DIR}/parm
             FIX_DIR=${CYLC_WORKFLOW_RUN_DIR}/fix
+            ARCHIVE_ROOT={{ ARCHIVE_ROOT }}
+            ARCHIVE_DIR=$ARCHIVE_ROOT/${CYLC_WORKFLOW_NAME}/${CYLC_TASK_CYCLE_POINT}
             FCST_END_TIME=$(isodatetime ${CYLC_TASK_CYCLE_POINT} --offset={{ FCSTDURATION }})
             syyyy=${CYLC_TASK_CYCLE_POINT:0:4}
             smm=${CYLC_TASK_CYCLE_POINT:4:2}
@@ -61,10 +67,11 @@
 
     [[getSKRIPSsrc]]
         script="""
+            rm -rf $SKRIPS_DIR
             mkdir -p $SKRIPS_DIR
             cd $SKRIPS_DIR
             git clone --recursive --depth 1 --branch forSeas https://github.com/prajeeshag/SKRIPS.git .
-            rm -rf .git
+            echo "Cloned repository"
         """
         post-script=" echo 'set the site specific env file using command ./compile.sh set_machine' && exit 1 "
 
@@ -102,7 +109,8 @@
         [[[environment]]]
             memN=$CYLC_TASK_PARAM_mem
             MEM_SHARE_DIR=${SHARE_DIR}/mem${CYLC_TASK_PARAM_mem}
-            OUTDIR=$MEM_SHARE_DIR/archive/outputs
+            MEM_ARCHIVE_DIR=${ARCHIVE_DIR}/mem${CYLC_TASK_PARAM_mem}
+            OUTDIR=$MEM_SHARE_DIR/archive/outputs # TODO: shouldn't be inside share
 
     [[WRF]]
         [[[environment]]]
@@ -241,7 +249,10 @@
             envsuball $PARM_DIR/mitgcm/*
         """
         script = "$run_cmd $mitgcm_exe"
-        post-script="mv pickup.ckptA.* $MEM_SHARE_DIR"
+        post-script="""
+            mv pickup.ckptA.* $MEM_SHARE_DIR
+            rm -rf *
+        """
         [[[environment]]]
             mitgcm_exe=$SKRIPS_DIR/build/${SKRIPS_BUILD_NAME}/${cpuOCN}/mitgcm/mitgcmuv
             endTime=$(isodatetime --as-total=s {{ RUNDURATION_BAL }} )
@@ -275,6 +286,7 @@
             rm pickup.ckptA.*
             mv *_d??_????-??-??_* $MEM_SHARE_DIR
             mv *.data *.meta *.log $MEM_SHARE_DIR
+            rm -rf *
         """
         [[[environment]]]
             cpldDt={{ cpldDt }}
@@ -296,6 +308,7 @@
         post-script = """
             mkdir -p $OUTDIR
             mv *.grb2 $OUTDIR
+            rm -rf *
         """
         [[[environment]]]
             # run_cmd = site specific run command: e.g. "srun --exclusive --mem-per-cpu=2G --ntasks=16 "
@@ -318,6 +331,7 @@
         post-script = """
             mkdir -p $OUTDIR
             mv *.nc $OUTDIR
+            rm -rf *
         """
         [[[environment]]]
             date="${syyyy}-${smm}-${sdd}:${shh}:00:00"
@@ -325,6 +339,25 @@
 
     [[mitgcm2nc<mem>]]
         inherit = MITGCM2NC, ENSMEMBER
+
+    [[ARCHIVE]]
+        script = """
+        cd $MEM_SHARE_DIR
+        mkdir -p $MEM_ARCHIVE_DIR
+        rsync -av archive/* $MEM_ARCHIVE_DIR
+        """
+
+    [[archive<mem>]]
+        inherit = ARCHIVE, ENSMEMBER
+
+    [[CLEANUP]]
+        script = """
+        cd $MEM_SHARE_DIR
+        rm -rf *
+        """ #TODO: This is risky, archive directory shouldn't be inside share
+
+    [[cleanUp<mem>]]
+        inherit = CLEANUP, ENSMEMBER
 
 
 {% include 'include/' ~ SITE ~ '/flow.cylc' %}
