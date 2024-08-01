@@ -48,7 +48,7 @@ function __koimain {
     dd=$(echo "$ffile" | rev | cut -c10-11 | rev)
     mm=$(echo "$ffile" | rev | cut -c13-14 | rev)
     yyyy=$(echo "$ffile" | rev | cut -c16-19 | rev)
-    dateStamp=${yyyy}-${mm}-${dd}T${hr}:${mn}:${sc}
+    dateStamp=${yyyy}-${mm}-${dd}_${hr}:${mn}:${sc}
     dateStamp1=${yyyy}_${mm}_${dd}_${hr}_${mn}_${sc}
 
     cat <<EOF >itag

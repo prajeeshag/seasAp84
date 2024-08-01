@@ -4,7 +4,7 @@
 {% if SITE is not defined %}
     {% from 'site.cylc' import SITE %}
 {% endif %}
-{% from 'include/' ~ SITE ~ '/param.cylc' import ARCHIVE_ROOT %}
+{% from 'include/' ~ SITE ~ '/param.cylc' import ARCHIVE_ROOT, SKRIPS_DIR %}
 {% from 'param.cylc' import atmDt, ocnDt, cpldDt, cpuOCN, ocnDtBal %}
 {% from 'param.cylc' import FCSTDURATION, RUNDURATION_BAL, NMEMBERS %}
 {% from 'param.cylc' import initialCyclePoint, finalCyclePoint %}
@@ -21,15 +21,19 @@
     initial cycle point = {{ initialCyclePoint }}
     final cycle point = {{ finalCyclePoint }}
     [[graph]]
+        # R1 = """
+        #     getSKRIPSsrc => bldWRF & bldESMF & bldMITGCM & bldUPP
+        #     bldWRF & bldESMF & bldMITGCM => bldSKRIPS
+        #     bldWRF => bldWPS
+        #     bldSKRIPS & bldWPS & bldUPP => installDone
+        # """
         R1 = """
-            getSKRIPSsrc => bldWRF & bldESMF & bldMITGCM & bldUPP
-            bldWRF & bldESMF & bldMITGCM => bldSKRIPS
-            bldWRF => bldWPS
-            bldSKRIPS & bldWPS & bldUPP => installDone
+            installMambaPkgs => installDone
         """
 
         P1M = """
-            installDone[^] => getAtmInput<mem> & getSfcInput & mkOcnICBC<mem>
+            installMambaPkgs[^] => mkOcnICBC<mem>
+            getAtmInput<mem> & getSfcInput & mkOcnICBC<mem>
             mkOcnICBC<mem> => mitgcmBal<mem>
             getAtmInput<mem>:done & getSfcInput => ungrib<mem>
             ungrib<mem> => metgrid<mem>
@@ -37,9 +41,11 @@
             mitgcmBal<mem> & real<mem> => skrips<mem>
             skrips<mem> => upp<mem>
             skrips<mem> => mitgcm2nc<mem>
+            skrips<mem> => varSplitWRF2d<mem>
             upp<mem> => archive<mem>
             mitgcm2nc<mem> => archive<mem>
-            archive<mem> => cleanUp<mem>
+            varSplitWRF2d<mem> => archive<mem>
+            #archive<mem> => cleanUp<mem>
         """
 
 [runtime]
@@ -47,7 +53,7 @@
         ## Keep the runtime.root to as minimal as possible
         execution retry delays = PT2M
         [[[environment]]]
-            SKRIPS_DIR=${CYLC_WORKFLOW_SHARE_DIR}/SKRIPS
+            SKRIPS_DIR={{SKRIPS_DIR}}
             SKRIPS_BUILD_NAME=AP4km
             CYCLE_DIR=${CYLC_WORKFLOW_WORK_DIR}/${CYLC_TASK_CYCLE_POINT}
             SHARE_DIR=${CYCLE_DIR}/share # TODO Shouldn't be inside work, move it WORKFLOW_SHARE_DIR
@@ -303,7 +309,7 @@
         inherit = SKRIPS, ENSMEMBER
 
     [[UPP]]
-        pre-script = "ln -sf $MEM_SHARE_DIR/wrf?d_d??_????-??-??_* ."
+        pre-script = "ln -sf $MEM_SHARE_DIR/wrf3d_d01_????-??-??_* ."
         script = "upp.sh $prefixes"
         post-script = """
             mkdir -p $OUTDIR
@@ -313,10 +319,20 @@
         [[[environment]]]
             # run_cmd = site specific run command: e.g. "srun --exclusive --mem-per-cpu=2G --ntasks=16 "
             # max_par_jobs=10
-            prefixes="wrf2d wrf3d"
-
+            prefixes="wrf3d"
     [[upp<mem>]]
         inherit = UPP, ENSMEMBER
+
+    [[VAR_SPLIT_WRF2d]]
+        script = "varSplitWrf.sh -p wrf2d_ $MEM_SHARE_DIR/wrf2d_d01_????-??-??_*"
+        post-script = """
+            mkdir -p $OUTDIR
+            mv wrf2d_*.nc $OUTDIR
+            rm -rf *
+        """
+
+    [[varSplitWRF2d<mem>]]
+        inherit = VAR_SPLIT_WRF2d, ENSMEMBER
 
     [[MITGCM2NC]]
         inherit = None, MITGCM
