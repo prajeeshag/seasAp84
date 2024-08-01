@@ -28,7 +28,7 @@ def write_to_nc(prefix: str, startdate: str, dt: int):
               "chunksizes": tuple(map(lambda x: x // 10, var.shape)),
           }
       }
-      var.to_netcdf(f'{var_name}_{prefix}.nc', encoding=encode)
+      var.to_netcdf(f'{prefix}_{var_name}.nc', encoding=encode)
     
 
 if __name__ == "__main__":

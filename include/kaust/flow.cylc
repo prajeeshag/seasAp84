@@ -10,9 +10,6 @@
 
 [scheduling]
     [[graph]]
-        R1 = """
-            installMambaPkgs => installDone
-        """
         P1M = """
             installDone[^] => cpSEAS5Atm
             cpSEAS5Atm => getAtmInput<mem>
@@ -125,7 +122,7 @@
             --nodes = 1
             --partition=workq
 
-    [[getSfcInput, GET_ATM_INPUT, MK_OCN_ICBC, UNGRIB, METGRID, MITGCM2NC]]
+    [[getSfcInput, GET_ATM_INPUT, MK_OCN_ICBC, UNGRIB, METGRID, MITGCM2NC, VAR_SPLIT_WRF2d]]
         platform=shaheen
         [[[directives]]]
             --account=k10035
