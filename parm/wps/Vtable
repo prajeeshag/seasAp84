@@ -7,6 +7,7 @@ Code | Code |   1  |   2  | Name     |  Units   | Description                   
  131 | 100  |   *  |      | UU       | m s-1    | U                                        |
  132 | 100  |   *  |      | VV       | m s-1    | V                                        |
  157 | 100  |   *  |      | RH       | %        | Relative Humidity                        |
+ 133 | 100  |   *  |      | SPECHUMD | kg kg-1  | Specific humidity                        |
  165 |  1   |   0  |      | UU       | m s-1    | U                    At 10 m             | 
  166 |  1   |   0  |      | VV       | m s-1    | V                    At 10 m             | 
  167 |  1   |   0  |      | TT       | K        | Temperature          At  2 m             | 

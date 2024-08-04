@@ -26,7 +26,7 @@ io_form_restart          = 2,
 io_form_history          = 2,
 
 auxinput4_inname         = "wrflowinp_d<domain>"
-auxinput4_interval       = 1000000000,      
+auxinput4_interval       = ${wrflowinp_interval}, 
 io_form_auxinput4        = 2,
 
 debug_level              = 0,

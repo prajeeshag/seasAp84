@@ -1,10 +1,7 @@
 #!Jinja2
 
-
-{% if SITE is not defined %}
-    {% from 'site.cylc' import SITE %}
-{% endif %}
-{% from 'include/' ~ SITE ~ '/param.cylc' import ARCHIVE_ROOT, SKRIPS_DIR %}
+{% from 'site.cylc' import SITE, wrfOnly, sfcERA5Full %}
+{% from 'site.cylc' import ARCHIVE_ROOT, SKRIPS_DIR %}
 {% from 'param.cylc' import atmDt, ocnDt, cpldDt, cpuOCN, ocnDtBal %}
 {% from 'param.cylc' import FCSTDURATION, RUNDURATION_BAL, NMEMBERS %}
 {% from 'param.cylc' import initialCyclePoint, finalCyclePoint %}
@@ -32,18 +29,29 @@
         """
 
         P1M = """
-            installMambaPkgs[^] => mkOcnICBC<mem>
-            getAtmInput<mem> & getSfcInput & mkOcnICBC<mem>
-            mkOcnICBC<mem> => mitgcmBal<mem>
+            {% if not wrfOnly %}
+                installMambaPkgs[^] => mkOcnICBC<mem>
+                mkOcnICBC<mem> => mitgcmBal<mem>
+                mitgcmBal<mem> => skrips<mem>
+                mitgcm2nc<mem> => archive<mem>
+            {% endif %}
+
             getAtmInput<mem>:done & getSfcInput => ungrib<mem>
             ungrib<mem> => metgrid<mem>
             metgrid<mem> => real<mem>
-            mitgcmBal<mem> & real<mem> => skrips<mem>
-            skrips<mem> => upp<mem>
-            skrips<mem> => mitgcm2nc<mem>
-            skrips<mem> => varSplitWRF2d<mem>
+
+            {% if not wrfOnly %}
+                real<mem> => skrips<mem>
+                skrips<mem> => upp<mem>
+                skrips<mem> => mitgcm2nc<mem>
+                skrips<mem> => varSplitWRF2d<mem>
+            {% else %}
+                real<mem> => wrfOnly<mem>
+                wrfOnly<mem> => upp<mem>
+                wrfOnly<mem> => varSplitWRF2d<mem>
+            {% endif %}
+
             upp<mem> => archive<mem>
-            mitgcm2nc<mem> => archive<mem>
             varSplitWRF2d<mem> => archive<mem>
             #archive<mem> => cleanUp<mem>
         """
@@ -127,6 +135,7 @@
             wrf2dFreq=3600 # hourly
             restart='.false.'
             restart_interval=$(isodatetime --as-total=m {{ FCSTDURATION }} )
+            wrflowinp_interval=43200
 
     [[MITGCM]]
         [[[environment]]]
@@ -139,12 +148,26 @@
             cpuOCN={{ cpuOCN }}
             pickupSuff="' '"
 
-    [[getSfcInput]]
-        script = "getSfcInput -y $yyyy -m $mm -i $input -o $SHARE_DIR/sfc.grib"
-        [[[environment]]]
-            yyyy=${CYLC_TASK_CYCLE_POINT:0:4}
-            mm=${CYLC_TASK_CYCLE_POINT:4:2}
-            # input= site specific: path to input
+        [[getSfcInput]]
+            {% if sfcERA5Full %}
+                script="""
+                    cdate=$CYLC_TASK_CYCLE_POINT
+                    mkdir -p $SHARE_DIR
+                    for i in $(seq 1 7); do
+                        year=${cdate:0:4}
+                        mon=${cdate:4:2}
+                        ln -sf /scratch/athippp/DATA/ERA5/era5_Mena_sfc_${year}_${mon}.grib $SHARE_DIR/sfc_${i}.grib
+                        cdate=$(isodatetime $cdate --offset=P1M)
+                    done
+                """
+            {% else %}
+                script = "getSfcInput -y $yyyy -m $mm -i $input -o $SHARE_DIR/sfc_1.grib"
+            {% endif %}
+            [[[environment]]]
+                yyyy=${CYLC_TASK_CYCLE_POINT:0:4}
+                mm=${CYLC_TASK_CYCLE_POINT:4:2}
+                # input= site specific: path to input
+    
 
     [[GET_ATM_INPUT]]
         script = """
@@ -186,7 +209,7 @@
         pre-script = """
             rm -rf *
             ln_safe $MEM_SHARE_DIR/atmPrs.grib .
-            ln_safe $SHARE_DIR/sfc.grib .
+            ln_safe $SHARE_DIR/sfc_*.grib .
             envsub $PARM_DIR/wps/namelist.wps namelist.wps
             envsub $PARM_DIR/wps/Vtable Vtable
             ln_safe "$ungrib_dir" .
@@ -304,9 +327,36 @@
             #run_cmd = site specific run command: e.g. mpirun -n 4
             #cpuATM = site specific
             cpuOCN = {{ cpuOCN }}
+            wrflowinp_interval=100000000
 
     [[skrips<mem>]]
         inherit = SKRIPS, ENSMEMBER
+
+    [[WRF_ONLY]]
+        inherit = None, WRF
+        pre-script = """
+            rm -rf *
+            ln -sf $MEM_SHARE_DIR/wrf*_d?? .
+            cp -f $em_real_dir/* .
+            ln_safe $FIX_DIR/geo_em.d01.nc .
+            envsuball $PARM_DIR/wrf/*
+        """
+
+        script = "$run_cmd $wrf_exe"
+
+        post-script = """
+            mv *_d??_????-??-??_* $MEM_SHARE_DIR
+            rm -rf *
+        """
+        [[[environment]]]
+            atmDt={{ atmDt }}
+            em_real_dir=$SKRIPS_DIR/external/WRF/test/em_real
+            wrf_exe=$SKRIPS_DIR/external/WRF/main/wrf.exe
+            #run_cmd = site specific run command: e.g. mpirun -n 4
+            #cpuATM = site specific
+
+    [[wrfOnly<mem>]]
+        inherit = WRF_ONLY, ENSMEMBER
 
     [[UPP]]
         pre-script = "ln -sf $MEM_SHARE_DIR/wrf3d_d01_????-??-??_* ."

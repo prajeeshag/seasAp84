@@ -7,5 +7,5 @@
 {% set ocnDtBal = 20 %}
 {% set cpldDt = 180 %}
 
-{% set NMEMBERS = 25 %}
+{% set NMEMBERS = 1 %}
 {% set cpuOCN = 238 %} # Do not change this

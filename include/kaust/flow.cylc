@@ -99,6 +99,25 @@
             nproc_y={{ nproc_y }}
             cpuATM={{ cpuATM }}
 
+    [[WRF_ONLY]]
+        execution time limit = PT13H
+        platform=shaheen
+        {% set cpuTotal=cpuATM %}
+        [[[directives]]]
+            --account=k10035
+            {% set nodes = (cpuTotal + cpuPerNode - 1) // cpuPerNode %}
+            --nodes={{ nodes }}
+            --ntasks={{ cpuTotal }}
+            --partition=workq
+        [[[environment]]]
+            FI_CXI_RX_MATCH_MODE=hybrid
+            run_cmd = "srun -n {{ cpuTotal }} --distribution=block:block --hint=nomultithread"
+            nio_groups={{ nio_groups }}
+            nio_tasks_per_group={{ nio_tasks_per_group }}
+            nproc_x={{ nproc_x }}
+            nproc_y={{ nproc_y }}
+            cpuATM={{ cpuATM }}
+
     [[UPP]]
         execution time limit = PT10H
         [[[environment]]]
