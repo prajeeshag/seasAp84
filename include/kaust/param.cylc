@@ -1,3 +1,0 @@
-
-{% set ARCHIVE_ROOT = '/scratch/athippp/cylc-archive' %}
-{% set SKRIPS_DIR = '/scratch/athippp/iops/SKRIPS' %}
