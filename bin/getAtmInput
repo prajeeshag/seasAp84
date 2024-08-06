@@ -21,8 +21,8 @@ __koimain() {
 
 	mkdir -p "$(dirname "$output")"
 
-	scount=$((nrecords * (memN - 1)))
-	ecount=$((nrecords * memN))
+	scount=$((nrecords * (member - 1)))
+	ecount=$((nrecords * member))
 
 	filter=$(mktemp --suffix=".filter" -p .)
 
