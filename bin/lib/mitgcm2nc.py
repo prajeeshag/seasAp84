@@ -6,10 +6,10 @@ import typer
 app = typer.Typer()
 
 @app.command()
-def write_to_nc(prefix: str, startdate: str, dt: int):
+def write_to_nc(prefix: str, startdate: str, dt: int, geometry="curvilinear"):
     ds = open_mdsdataset(
         "./",
-        geometry="curvilinear",
+        geometry=geometry,
         delta_t=dt,
         ref_date=startdate,
         prefix=[
