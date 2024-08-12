@@ -24,8 +24,8 @@ __koimain() {
 	mkdir -p "$(dirname "$output")"
 
 	tmpfile=$(mktemp -p . --suffix=".grib")
-	$CDO -selyear,"${year}" -selmon,"${month}" "$input" "$tmpfile"
-	endHours=$((190 * 24))
+	$CDO -settaxis,"${year}-${month}-01",00:00:00,1mon -selmon,"${month}" "$input" "$tmpfile"
+	endHours=$((220 * 24))
 	optr="$tmpfile"
 	for i in $(seq 12 12 $endHours); do
 		tshift="${i}hour"

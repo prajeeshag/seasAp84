@@ -11,8 +11,8 @@
 [scheduling]
     [[graph]]
         P1M = """
-            installDone[^] => cpSEAS5Atm
-            cpSEAS5Atm => getAtmInput<mem>
+            getUngribInputs<mem> => ungrib<mem>
+            getSoilInput => ungrib<mem>
         """
 
 [runtime]
@@ -30,23 +30,31 @@
     [[getSKRIPSsrc]]
         post-script = "cd $SKRIPS_DIR; ./compile.sh set_machine shaheen3_intel"
 
-    [[cpSEAS5Atm]]
-        script = "rsync -av $input_dir/seas5_mena_*.grib . $CYCLE_DIR"
+    [[GET_UNGRIB_INPUTS]]
+        script = """
+            mkdir -p $MEM_SHARE_DIR/ungrib_inputs/
+            cd $MEM_SHARE_DIR/ungrib_inputs/
+            ln -sf /scratch/athippp/SEAS5_Atm/plev/${yyyy}${mm}01T0000Z/mem${memN}/* . 
+            ln -sf /scratch/athippp/SEAS5_Atm/sfc/${yyyy}${mm}01T0000Z/mem${memN}/* . 
+        """
+        [[[environment]]]
+            yyyy=${CYLC_TASK_CYCLE_POINT:0:4}
+            mm=${CYLC_TASK_CYCLE_POINT:4:2}
+
+    [[getUngribInputs<mem>]]
+        inherit = GET_UNGRIB_INPUTS, ENSMEMBER
+
+    [[getSoilInput]]
+        script = """
+        mkdir -p $SHARE_DIR/ungrib_inputs
+        getSfcInput -y $yyyy -m $mm -i $input -o $SHARE_DIR/ungrib_inputs/soil_inputs.grib
+        """
         execution time limit = PT30M
         [[[environment]]]
             yyyy=${CYLC_TASK_CYCLE_POINT:0:4}
             mm=${CYLC_TASK_CYCLE_POINT:4:2}
-            input_dir="$DATA_DIR/ECMWF/SEAS5/ATM/pl/${yyyy}${mm}01T0000Z"
-
-    [[getSfcInput]]
-        execution time limit = PT30M
-        [[[environment]]]
-            input=$DATA_DIR/ERA5/ForSeas/era5_Mena_sfc_2009-2023.grib
-
-    [[GET_ATM_INPUT]]
-        execution time limit = PT30M
-        [[[environment]]]
-            input_dir=$CYCLE_DIR
+            input=/scratch/athippp/SEAS5_Atm/sfc/era5_soil_sfc_Mena_clim.grib
+            # input= site specific: path to input
 
     [[MK_OCN_ICBC]]
         execution time limit = PT30M
@@ -141,7 +149,7 @@
             --nodes = 1
             --partition=workq
 
-    [[getSfcInput, GET_ATM_INPUT, MK_OCN_ICBC, UNGRIB, METGRID, MITGCM2NC, VAR_SPLIT_WRF2d]]
+    [[getSoilInput, MK_OCN_ICBC, UNGRIB, METGRID, MITGCM2NC, VAR_SPLIT_WRF2d]]
         platform=shaheen
         [[[directives]]]
             --account=k10035

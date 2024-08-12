@@ -1,11 +1,8 @@
-{% set FCSTDURATION = 'P185D' %}
+{% set FCSTDURATION = 'P214D' %}
 {% set RUNDURATION_BAL = 'P1D' %}
-{% set initialCyclePoint = '2009-01-02' %}
-{% set finalCyclePoint = '2009-01-02' %}
 {% set atmDt = 45 %}
 {% set ocnDt = 90 %}
 {% set ocnDtBal = 20 %}
 {% set cpldDt = 180 %}
 
-{% set NMEMBERS = 1 %}
 {% set cpuOCN = 238 %} # Do not change this

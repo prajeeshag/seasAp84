@@ -47,8 +47,14 @@ __koimain() {
 			ifile=${ifile:0:-3}
 		fi
 
+		# duplicating first month 2 times
+		temp_file=$(mktemp --suffix=.nc ./tmpfile.XXXXXX)
+		cdo -mergetime -seltimestep,1 "$ifile" -shifttime,1month "$ifile" "$temp_file"
+
 		if [ "$var" == 'T' ] || [ "$var" == 'S' ]; then
-			ifile="-ifthen $imask -selvar,${prefix} $ifile"
+			ifile="-ifthen $imask -selvar,${prefix} $temp_file"
+		else
+			ifile="$temp_file"
 		fi
 
 		$MKMITGCMBC \
