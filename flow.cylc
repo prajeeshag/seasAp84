@@ -1,10 +1,11 @@
 #!Jinja2
 
-{% from 'site.cylc' import SITE, wrfOnly, sfcERA5Full %}
+{% from 'site.cylc' import SITE, wrfOnly %}
 {% from 'site.cylc' import ARCHIVE_ROOT, SKRIPS_DIR %}
+{% from 'site.cylc' import initialCyclePoint, finalCyclePoint, NMEMBERS %}
+
 {% from 'param.cylc' import atmDt, ocnDt, cpldDt, cpuOCN, ocnDtBal %}
-{% from 'param.cylc' import FCSTDURATION, RUNDURATION_BAL, NMEMBERS %}
-{% from 'param.cylc' import initialCyclePoint, finalCyclePoint %}
+{% from 'param.cylc' import FCSTDURATION, RUNDURATION_BAL %}
 
 {% if graph is defined %}
     # For cylc graph set NMEMBERS = 2
@@ -18,14 +19,8 @@
     initial cycle point = {{ initialCyclePoint }}
     final cycle point = {{ finalCyclePoint }}
     [[graph]]
-        # R1 = """
-        #     getSKRIPSsrc => bldWRF & bldESMF & bldMITGCM & bldUPP
-        #     bldWRF & bldESMF & bldMITGCM => bldSKRIPS
-        #     bldWRF => bldWPS
-        #     bldSKRIPS & bldWPS & bldUPP => installDone
-        # """
         R1 = """
-            installMambaPkgs => installDone
+            installMambaPkgs
         """
 
         P1M = """
@@ -36,7 +31,6 @@
                 mitgcm2nc<mem> => archive<mem>
             {% endif %}
 
-            getAtmInput<mem>:done & getSfcInput => ungrib<mem>
             ungrib<mem> => metgrid<mem>
             metgrid<mem> => real<mem>
 
@@ -79,45 +73,8 @@
             edd=${FCST_END_TIME:6:2}
             ehh=${FCST_END_TIME:9:2}
 
-    [[getSKRIPSsrc]]
-        script="""
-            rm -rf $SKRIPS_DIR
-            mkdir -p $SKRIPS_DIR
-            cd $SKRIPS_DIR
-            git clone --recursive --depth 1 --branch forSeas https://github.com/prajeeshag/SKRIPS.git .
-            echo "Cloned repository"
-        """
-        post-script=" echo 'set the site specific env file using command ./compile.sh set_machine' && exit 1 "
-
-    [[bldESMF]]
-        script="cd $SKRIPS_DIR; ./compile.sh esmf"
-
-    [[bldWRF]]
-        script="cd $SKRIPS_DIR; ./compile.sh wrf"
-
-    [[bldMITGCM]]
-        script="""
-            cd $SKRIPS_DIR
-            ./compile.sh mitgcm --code examples/$SKRIPS_BUILD_NAME/code_{{ cpuOCN }} --exe $SKRIPS_BUILD_NAME
-        """
-
-    [[bldSKRIPS]]
-        script="""
-            cd $SKRIPS_DIR
-            ./compile.sh skrips --exe build/$SKRIPS_BUILD_NAME/{{ cpuOCN }}
-        """
-
-    [[bldWPS]]
-        script="cd $SKRIPS_DIR; ./compile.sh wps"
-
-    [[bldUPP]]
-        script="cd $SKRIPS_DIR; ./compile.sh upp"
-
     [[installMambaPkgs]]
         script=" $MAMBACMD create -f $PARM_DIR/env.yaml -y "
-
-    [[installDone]]
-        # Empty task to ensure all compilation is completed
 
     [[ENSMEMBER]]
         [[[environment]]]
@@ -148,46 +105,6 @@
             cpuOCN={{ cpuOCN }}
             pickupSuff="' '"
 
-        [[getSfcInput]]
-            {% if sfcERA5Full %}
-                script="""
-                    cdate=$CYLC_TASK_CYCLE_POINT
-                    mkdir -p $SHARE_DIR
-                    for i in $(seq 1 7); do
-                        year=${cdate:0:4}
-                        mon=${cdate:4:2}
-                        ln -sf /scratch/athippp/DATA/ERA5/era5_Mena_sfc_${year}_${mon}.grib $SHARE_DIR/sfc_${i}.grib
-                        cdate=$(isodatetime $cdate --offset=P1M)
-                    done
-                """
-            {% else %}
-                script = "getSfcInput -y $yyyy -m $mm -i $input -o $SHARE_DIR/sfc_1.grib"
-            {% endif %}
-            [[[environment]]]
-                yyyy=${CYLC_TASK_CYCLE_POINT:0:4}
-                mm=${CYLC_TASK_CYCLE_POINT:4:2}
-                # input= site specific: path to input
-    
-
-    [[GET_ATM_INPUT]]
-        script = """
-            getAtmInput -i $input_dir -o $MEM_SHARE_DIR/atmPrs.grib -m $memN --nrecords $nrecords
-
-            # task sometime exit with error even after successful completion
-            # done output is used to trigger the dependecies to bypass this problem
-            cylc message -- "${CYLC_WORKFLOW_ID}" "${CYLC_TASK_JOB}" "done"
-        """
-        execution retry delays = PT2M, 2*PT5M # grib_filter is unstable
-        [[[outputs]]]
-            done = "done"
-        [[[environment]]]
-            # memN from inheritance
-            nrecords=7680
-            # input_dir= site specific: path to input_directory
-
-    [[getAtmInput<mem>]]
-        inherit = GET_ATM_INPUT, ENSMEMBER
-
     [[MK_OCN_ICBC]]
         inherit = None, MITGCM
         pre-script = """
@@ -208,8 +125,8 @@
     [[UNGRIB]]
         pre-script = """
             rm -rf *
-            ln_safe $MEM_SHARE_DIR/atmPrs.grib .
-            ln_safe $SHARE_DIR/sfc_*.grib .
+            ln -sf $MEM_SHARE_DIR/ungrib_inputs/*.grib .
+            ln -sf $SHARE_DIR/ungrib_inputs/*.grib .
             envsub $PARM_DIR/wps/namelist.wps namelist.wps
             envsub $PARM_DIR/wps/Vtable Vtable
             ln_safe "$ungrib_dir" .
