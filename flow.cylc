@@ -12,6 +12,9 @@
     {% set NMEMBERS=2 %}
 {% endif %}
 
+[scheduler]
+    install = parm/, fix/
+
 [task parameters]
     mem = 1..{{ NMEMBERS }}
 
