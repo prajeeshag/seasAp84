@@ -21,16 +21,16 @@
         init-script = """
             export PATH="/scratch/athippp/iops/micromamba/envs/ap84SeasRF/bin:$PATH"
         """
+        platform=shaheen
         [[[environment]]]
             DATA_DIR="/project/k10035/athippp/DATA"
 
     [[installMambaPkgs]]
+        platform=shaheen_login
         script=" micromamba create -f $PARM_DIR/env.yaml -y "
 
-    [[getSKRIPSsrc]]
-        post-script = "cd $SKRIPS_DIR; ./compile.sh set_machine shaheen3_intel"
-
     [[GET_UNGRIB_INPUTS]]
+        platform=shaheen_login
         script = """
             mkdir -p $MEM_SHARE_DIR/ungrib_inputs/
             cd $MEM_SHARE_DIR/ungrib_inputs/
@@ -78,7 +78,6 @@
 
     [[MITGCM_BAL]]
         execution time limit = PT1H
-        platform=shaheen
         [[[directives]]]
             --account=k10035
             {% set nodes = (cpuOCN + cpuPerNode - 1) // cpuPerNode %}
@@ -90,7 +89,6 @@
 
     [[SKRIPS]]
         execution time limit = PT13H
-        platform=shaheen
         {% set cpuTotal=cpuATM+cpuOCN %}
         [[[directives]]]
             --account=k10035
@@ -109,7 +107,6 @@
 
     [[WRF_ONLY]]
         execution time limit = PT13H
-        platform=shaheen
         {% set cpuTotal=cpuATM %}
         [[[directives]]]
             --account=k10035
@@ -143,14 +140,12 @@
 
 # Platform settings
     [[REAL, UPP]]
-        platform=shaheen
         [[[directives]]]
             --account=k10035
             --nodes = 1
             --partition=workq
 
     [[getSoilInput, MK_OCN_ICBC, UNGRIB, METGRID, MITGCM2NC, VAR_SPLIT_WRF2d]]
-        platform=shaheen
         [[[directives]]]
             --account=k10035
             --nodes = 1
