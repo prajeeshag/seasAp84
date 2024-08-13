@@ -21,6 +21,11 @@
 [scheduling]
     initial cycle point = {{ initialCyclePoint }}
     final cycle point = {{ finalCyclePoint }}
+    [[queues]]
+        [[[main_queue]]]
+            limit = 50  # Only 3 mains dishes at one time.
+            members = SKRIPS
+
     [[graph]]
         R1 = """
             installMambaPkgs
@@ -63,7 +68,6 @@
             CYCLE_DIR=${CYLC_WORKFLOW_WORK_DIR}/${CYLC_TASK_CYCLE_POINT}
             SHARE_DIR=${CYCLE_DIR}/share # TODO Shouldn't be inside work, move it WORKFLOW_SHARE_DIR
             PARM_DIR=${CYLC_WORKFLOW_RUN_DIR}/parm
-            FIX_DIR=${CYLC_WORKFLOW_RUN_DIR}/fix
             ARCHIVE_ROOT={{ ARCHIVE_ROOT }}
             ARCHIVE_DIR=$ARCHIVE_ROOT/${CYLC_WORKFLOW_NAME}/${CYLC_TASK_CYCLE_POINT}
             FCST_END_TIME=$(isodatetime ${CYLC_TASK_CYCLE_POINT} --offset={{ FCSTDURATION }})
