@@ -24,6 +24,7 @@
         platform=shaheen
         [[[environment]]]
             DATA_DIR="/project/k10035/athippp/DATA"
+            FIX_DIR=/scratch/athippp/iops/ap84SeasRF/fix
 
     [[installMambaPkgs]]
         platform=shaheen_login
