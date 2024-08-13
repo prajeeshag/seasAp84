@@ -29,7 +29,7 @@ __koimain() {
 		count=$(echo "$files" | wc -w)
 		ifile=$files
 		if [ "$count" -eq 2 ]; then
-			dfiles=("${files}")
+			dfiles=(${files})
 			siz0=$(stat -c %s "${dfiles[0]}")
 			siz1=$(stat -c %s "${dfiles[1]}")
 			if ((siz1 > siz0)); then

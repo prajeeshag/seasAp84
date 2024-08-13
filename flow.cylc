@@ -2,7 +2,7 @@
 
 {% from 'site.cylc' import SITE, wrfOnly %}
 {% from 'site.cylc' import ARCHIVE_ROOT, SKRIPS_DIR %}
-{% from 'site.cylc' import initialCyclePoint, finalCyclePoint, NMEMBERS %}
+{% from 'site.cylc' import initialCyclePoint, finalCyclePoint, NMEMBERS, cycle %}
 
 {% from 'param.cylc' import atmDt, ocnDt, cpldDt, cpuOCN, ocnDtBal %}
 {% from 'param.cylc' import FCSTDURATION, RUNDURATION_BAL %}
@@ -23,7 +23,7 @@
             installMambaPkgs
         """
 
-        P1M = """
+        {{cycle}} = """
             {% if not wrfOnly %}
                 installMambaPkgs[^] => mkOcnICBC<mem>
                 mkOcnICBC<mem> => mitgcmBal<mem>
