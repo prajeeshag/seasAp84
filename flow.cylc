@@ -55,7 +55,8 @@
 
             upp<mem> => archive<mem>
             varSplitWRF2d<mem> => archive<mem>
-            #archive<mem> => cleanUp<mem>
+            archive<mem> => cleanUp<mem>
+            cleanUp<mem> => cleanAll
         """
 
 [runtime]
@@ -121,7 +122,10 @@
             ln_safe $FIX_DIR/tile001.mitgrid .
         """
         script = "mkOcnICBC -i $input_dir --nx $ocn_nx --ny $ocn_ny --imask $seas5_ocn_mask"
-        post-script = "mv ob*.bin *_ini.bin $MEM_SHARE_DIR"
+        post-script = """
+            mv ob*.bin *_ini.bin $MEM_SHARE_DIR
+            rm -rf *
+        """
         [[[environment]]]
             #seas5_ocn_mask
             #input_dir
@@ -143,7 +147,10 @@
             ./ungrib/ungrib.exe
             grep "Successful completion" ungrib.log
         """
-        post-script = "mv FILE* $MEM_SHARE_DIR"
+        post-script = """
+            mv FILE* $MEM_SHARE_DIR
+            rm -rf *
+        """
         [[[environment]]]
             ungrib_dir=$SKRIPS_DIR/external/WPS/ungrib
             link_grib=$SKRIPS_DIR/external/WPS/link_grib.csh
@@ -163,7 +170,10 @@
             ./metgrid/metgrid.exe
             grep "Successful completion" metgrid.log
         """
-        post-script = "mv met_em* $MEM_SHARE_DIR"
+        post-script = """
+            mv met_em* $MEM_SHARE_DIR
+            rm -rf *
+        """
         [[[environment]]]
             metgrid_dir=$SKRIPS_DIR/external/WPS/metgrid
 
@@ -178,7 +188,10 @@
             envsuball $PARM_DIR/wrf/*
         """
         script = "$run_cmd $real_exe"
-        post-script = "mv wrf*_d?? $MEM_SHARE_DIR"
+        post-script = """
+            mv wrf*_d?? $MEM_SHARE_DIR
+            rm -rf *
+        """
 
         [[[environment]]]
             nproc_x=-1
@@ -342,12 +355,15 @@
 
     [[CLEANUP]]
         script = """
-        cd $MEM_SHARE_DIR
-        rm -rf *
+        rm -rf $MEM_SHARE_DIR
         """ #TODO: This is risky, archive directory shouldn't be inside share
 
     [[cleanUp<mem>]]
         inherit = CLEANUP, ENSMEMBER
 
+    [[cleanAll]]
+        script = """
+        rm -rf $CYCLE_DIR
+        """ #TODO: This is risky, archive directory shouldn't be inside share
 
 {% include 'include/' ~ SITE ~ '/flow.cylc' %}
