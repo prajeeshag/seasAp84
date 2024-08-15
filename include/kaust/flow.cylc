@@ -8,6 +8,8 @@
 
 {% set cpuATM = nio_groups * nio_tasks_per_group + nproc_x * nproc_y  %}
 
+{% set projectid = "k10023" %}
+
 [scheduling]
     [[graph]]
         P1M = """
@@ -80,7 +82,7 @@
     [[MITGCM_BAL]]
         execution time limit = PT1H
         [[[directives]]]
-            --account=k10035
+            --account={{projectid}}
             {% set nodes = (cpuOCN + cpuPerNode - 1) // cpuPerNode %}
             --nodes={{ nodes }}
             --ntasks={{ cpuOCN }}
@@ -92,7 +94,7 @@
         execution time limit = PT13H
         {% set cpuTotal=cpuATM+cpuOCN %}
         [[[directives]]]
-            --account=k10035
+            --account={{projectid}}
             {% set nodes = (cpuTotal + cpuPerNode - 1) // cpuPerNode %}
             --nodes={{ nodes }}
             --ntasks={{ cpuTotal }}
@@ -110,7 +112,7 @@
         execution time limit = PT13H
         {% set cpuTotal=cpuATM %}
         [[[directives]]]
-            --account=k10035
+            --account={{projectid}}
             {% set nodes = (cpuTotal + cpuPerNode - 1) // cpuPerNode %}
             --nodes={{ nodes }}
             --ntasks={{ cpuTotal }}
@@ -142,7 +144,7 @@
 # Platform settings
     [[REAL, UPP]]
         [[[directives]]]
-            --account=k10035
+            --account={{projectid}}
             --nodes = 1
             --partition=workq
 
