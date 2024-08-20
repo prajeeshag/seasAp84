@@ -23,7 +23,7 @@
     final cycle point = {{ finalCyclePoint }}
     [[queues]]
         [[[main_queue]]]
-            limit = 50  # Only 3 mains dishes at one time.
+            limit = 100  
             members = SKRIPS
 
     [[graph]]
