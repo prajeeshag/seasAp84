@@ -1,8 +1,0 @@
-{% set SITE='kaust' %}
-{% set wrfOnly=False %}
-{% set ARCHIVE_ROOT = '/scratch/athippp/cylc-archive' %}
-{% set SKRIPS_DIR = '/scratch/athippp/iops/SKRIPS' %}
-{% set NMEMBERS = 25 %}
-{% set initialCyclePoint = '2010-01-02' %}
-{% set finalCyclePoint = '2012-12-02' %}
-{% set cycle = "P1M" %}
