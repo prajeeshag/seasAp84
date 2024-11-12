@@ -12,10 +12,10 @@
 
 [scheduling]
     [[graph]]
-        {% if install_pkgs %}
-            installMambaPkgs[^] => getSoilInput<mem>
-        {% endif %}
         {{cycle}} = """
+        {% if install_pkgs %}
+            installMambaPkgs[^] => getSoilInput
+        {% endif %}
             getUngribInputs<mem> => ungrib<mem>
             getSoilInput => ungrib<mem>
         """
@@ -108,7 +108,7 @@
             nproc_y={{ nproc_y }}
             cpuATM={{ cpuATM }}
 
-    [[WRF_ONLY]]
+    [[ONLY_WRF]]
         execution time limit = PT13H
         {% set cpuTotal=cpuATM %}
         [[[directives]]]

@@ -161,6 +161,8 @@
             envsub $PARM_DIR/wps/namelist.wps namelist.wps
             ln_safe $metgrid_dir .
             ln_safe $FIX_DIR/{{atm_res}}/geo_em.d01_mod.nc geo_em.d01.nc
+            #  Use metgrid table from Hari for better SST interpolation
+            cp $PARM_DIR/wps/METGRID.TBL.ARW metgrid/METGRID.TBL
         """
         script = """
             ./metgrid/metgrid.exe
@@ -182,6 +184,8 @@
         pre-script = """
             rm -rf *
             ln -sf $MEM_SHARE_DIR/met_em* .
+            ln_safe $FIX_DIR/{{atm_res}}/geo_em.d01_mod.nc geo_em.d01.nc
+            source grid_info_wrf.sh geo_em.d01.nc
             envsuball $PARM_DIR/wrf/*
         """
         script = "$run_cmd $real_exe"
@@ -210,6 +214,7 @@
             ln_safe $FIX_DIR/{{atm_res}}/geo_em.d01_mod.nc geo_em.d01.nc
             source grid_info_wrf.sh geo_em.d01.nc
             envsuball $PARM_DIR/wrf/*
+            source $env_file
         """
 
         script = "$run_cmd $wrf_exe"
@@ -222,6 +227,7 @@
             atmDt={{ atmDt }}
             em_real_dir=$SKRIPS_DIR/external/WRF/test/em_real
             wrf_exe=$SKRIPS_DIR/external/WRF/main/wrf.exe
+            env_file=$SKRIPS_DIR/env.mach
             #run_cmd = site specific run command: e.g. mpirun -n 4
             #cpuATM = site specific
 
