@@ -18,7 +18,8 @@ def atmDt_default(x):
         return str(20)
     elif x["atm_res"] == "8km":
         return str(45)
-    raise ValueError(f"Unknown atm_res: {x["atm_res"]}")
+    atm_res = x["atm_res"]
+    raise ValueError(f"Unknown atm_res: {atm_res}")
 
 
 def set_default(key, default):
@@ -170,7 +171,14 @@ def main(cmd: CylcCommands, ans: str = "", defaults: bool = False):
             if k == "FCSTDURATION":
                 v = f"P{v}D"
             f.write(f"{lft} set {k} = {repr(v)} {rht}")
-    result = subprocess.run(["cylc", "vip", "-n", workflow_name, "--no-run-name", "."])
+
+    if cmd == CylcCommands.vip:
+        result = subprocess.run(
+            ["cylc", "vip", "-n", workflow_name, "--no-run-name", "."]
+        )
+    elif cmd == CylcCommands.vr:
+        result = subprocess.run(["cylc", "vr", workflow_name])
+
     return_code = result.returncode
     if return_code != 0:
         raise SystemExit(return_code)

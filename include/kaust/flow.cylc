@@ -8,11 +8,14 @@
 
 {% set cpuATM = nio_groups * nio_tasks_per_group + nproc_x * nproc_y  %}
 
-{% set projectid = "k10014" %}
+{% from 'site.cylc' import  account, use_shared_partition %}
 
 [scheduling]
     [[graph]]
-        P1M = """
+        {% if install_pkgs %}
+            installMambaPkgs[^] => getSoilInput<mem>
+        {% endif %}
+        {{cycle}} = """
             getUngribInputs<mem> => ungrib<mem>
             getSoilInput => ungrib<mem>
         """
@@ -21,16 +24,15 @@
 
     [[root]]
         init-script = """
-            export PATH="/scratch/athippp/iops/micromamba/envs/ap84SeasRF/bin:$PATH"
+            export PATH="{{PKG_INSTALL_ROOT}}/bin:$PATH"
         """
         platform=shaheen
-        [[[environment]]]
-            DATA_DIR="/project/k10035/athippp/DATA"
-            FIX_DIR=/scratch/athippp/iops/ap84SeasRF/fix
+        [[[directives]]]
+            --account={{account}}
+
 
     [[installMambaPkgs]]
         platform=shaheen_login
-        script=" micromamba create -f $PARM_DIR/env.yaml -y "
 
     [[GET_UNGRIB_INPUTS]]
         platform=shaheen_login
@@ -82,7 +84,6 @@
     [[MITGCM_BAL]]
         execution time limit = PT1H
         [[[directives]]]
-            --account={{projectid}}
             {% set nodes = (cpuOCN + cpuPerNode - 1) // cpuPerNode %}
             --nodes={{ nodes }}
             --ntasks={{ cpuOCN }}
@@ -94,7 +95,6 @@
         execution time limit = PT13H
         {% set cpuTotal=cpuATM+cpuOCN %}
         [[[directives]]]
-            --account={{projectid}}
             {% set nodes = (cpuTotal + cpuPerNode - 1) // cpuPerNode %}
             --nodes={{ nodes }}
             --ntasks={{ cpuTotal }}
@@ -112,7 +112,6 @@
         execution time limit = PT13H
         {% set cpuTotal=cpuATM %}
         [[[directives]]]
-            --account={{projectid}}
             {% set nodes = (cpuTotal + cpuPerNode - 1) // cpuPerNode %}
             --nodes={{ nodes }}
             --ntasks={{ cpuTotal }}
@@ -144,16 +143,16 @@
 # Platform settings
     [[REAL, UPP]]
         [[[directives]]]
-            --account={{projectid}}
             --nodes = 1
             --partition=workq
 
     [[getSoilInput, MK_OCN_ICBC, UNGRIB, METGRID, MITGCM2NC, VAR_SPLIT_WRF2d]]
         [[[directives]]]
-            --account=k10035
             --nodes = 1
             --ntasks = 1
+            {% if use_shared_partition %}
             --partition=shared
             --mem=8G
+            {% endif %}
 
 

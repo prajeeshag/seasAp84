@@ -16,7 +16,7 @@ Code | Code |   1  |   2  | Name     |  Units   | Description                   
  129 |  1   |   0  |      | SOILGEO  | m2 s-2   |                                          |
  134 |  1   |   0  |      | PSFC     | Pa       | Surface Pressure                         |
  151 |  1   |   0  |      | PMSL     | Pa       | Sea-level Pressure                       |
- 167 |  1   |   0  |      | SKINTEMP | K        | Sea-Surface Temperature                  |
+ 235 |  1   |   0  |      | SKINTEMP | K        | Sea-Surface Temperature                  |
   31 |  1   |   0  |      | SEAICE   | 0/1 Flag | Sea-Ice-Flag                             |
   34 |  1   |   0  |      | SST      | K        | Sea-Surface Temperature                  |
  141 |  1   |   0  |      | SNOW_EC  | m        |                                          |
