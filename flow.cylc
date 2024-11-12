@@ -1,16 +1,26 @@
 #!Jinja2
 
-{% from 'site.cylc' import SITE, wrfOnly %}
-{% from 'site.cylc' import ARCHIVE_ROOT, SKRIPS_DIR %}
-{% from 'site.cylc' import initialCyclePoint, finalCyclePoint, NMEMBERS, cycle %}
+{% from 'site.cylc' import SITE, CONDA_CMD, PKG_INSTALL_ROOT %}
+{% from 'site.cylc' import ARCHIVE_ROOT, SKRIPS_DIR, DATA_DIR, FIX_DIR %}
 
-{% from 'param.cylc' import atmDt, ocnDt, cpldDt, cpuOCN, ocnDtBal %}
-{% from 'param.cylc' import FCSTDURATION, RUNDURATION_BAL %}
+{% from 'param.cylc' import initialCyclePoint, NMEMBERS, cycle, only_wrf, install_pkgs, atmDt, FCSTDURATION, atm_res %}
+
+{% if cycle != 'R1' %}
+{% from 'site.cylc' import finalCyclePoint %}
+{% endif %}
+
+{% if not only_wrf %}
+{% from 'param.cylc' import ocnDt, cpldDt %}
+{% endif %}
 
 {% if graph is defined %}
     # For cylc graph set NMEMBERS = 2
     {% set NMEMBERS=2 %}
 {% endif %}
+
+{% set cpuOCN = 238 %}
+{% set ocnDtBal = 20 %}
+{% set RUNDURATION_BAL = 'P1D' %}
 
 [scheduler]
     install = parm/, fix/
@@ -19,21 +29,27 @@
     mem = 1..{{ NMEMBERS }}
 
 [scheduling]
-    initial cycle point = {{ initialCyclePoint }}
-    final cycle point = {{ finalCyclePoint }}
+    initial cycle point = {{ initialCyclePoint }}-02
+    {% if cycle != 'R1' %}
+    final cycle point = {{ finalCyclePoint }}-02
+    {% endif %}
     [[queues]]
         [[[main_queue]]]
             limit = 100  
             members = SKRIPS
 
     [[graph]]
+        {% if install_pkgs %}
         R1 = """
             installMambaPkgs
         """
+        {% endif %}
 
         {{cycle}} = """
-            {% if not wrfOnly %}
-                installMambaPkgs[^] => mkOcnICBC<mem>
+            {% if not only_wrf %}
+                {% if install_pkgs %}
+                    installMambaPkgs[^] => mkOcnICBC<mem>
+                {% endif %}
                 mkOcnICBC<mem> => mitgcmBal<mem>
                 mitgcmBal<mem> => skrips<mem>
                 mitgcm2nc<mem> => archive<mem>
@@ -42,15 +58,15 @@
             ungrib<mem> => metgrid<mem>
             metgrid<mem> => real<mem>
 
-            {% if not wrfOnly %}
+            {% if not only_wrf %}
                 real<mem> => skrips<mem>
                 skrips<mem> => upp<mem>
                 skrips<mem> => mitgcm2nc<mem>
                 skrips<mem> => varSplitWRF2d<mem>
             {% else %}
-                real<mem> => wrfOnly<mem>
-                wrfOnly<mem> => upp<mem>
-                wrfOnly<mem> => varSplitWRF2d<mem>
+                real<mem> => only_wrf<mem>
+                only_wrf<mem> => upp<mem>
+                only_wrf<mem> => varSplitWRF2d<mem>
             {% endif %}
 
             upp<mem> => archive<mem>
@@ -65,6 +81,8 @@
         execution retry delays = PT2M
         [[[environment]]]
             SKRIPS_DIR={{SKRIPS_DIR}}
+            DATA_DIR={{DATA_DIR}}
+            FIX_DIR={{FIX_DIR}}
             SKRIPS_BUILD_NAME=AP4km
             CYCLE_DIR=${CYLC_WORKFLOW_WORK_DIR}/${CYLC_TASK_CYCLE_POINT}
             SHARE_DIR=${CYCLE_DIR}/share # TODO Shouldn't be inside work, move it WORKFLOW_SHARE_DIR
@@ -81,8 +99,16 @@
             edd=${FCST_END_TIME:6:2}
             ehh=${FCST_END_TIME:9:2}
 
+            interval_seconds = 43200 # boundary forcing interval for wrf
+            {% if atm_res == "4km" %}
+                cu_physics = 0
+            {% else %}
+                cu_physics = 1
+            {% endif %}
+
     [[installMambaPkgs]]
-        script=" $MAMBACMD create -f $PARM_DIR/env.yaml -y "
+        platform=shaheen_login
+        script=" {{CONDA_CMD}} create -f $PARM_DIR/env.yaml -p {{PKG_INSTALL_ROOT}} -y  "
 
     [[ENSMEMBER]]
         [[[environment]]]
@@ -100,38 +126,7 @@
             wrf2dFreq=3600 # hourly
             restart='.false.'
             restart_interval=$(isodatetime --as-total=m {{ FCSTDURATION }} )
-            wrflowinp_interval=43200
-
-    [[MITGCM]]
-        [[[environment]]]
-            ocn_nx=800
-            ocn_ny=780
-            endTime=$(isodatetime --as-total=s {{ FCSTDURATION }} )
-            deltaT={{ ocnDt }}
-            ocn2dFreq=86400 # daily
-            ocn3dFreq=432000 # 5 day
-            cpuOCN={{ cpuOCN }}
-            pickupSuff="' '"
-
-    [[MK_OCN_ICBC]]
-        inherit = None, MITGCM
-        pre-script = """
-            rm -rf *
-            envsub $PARM_DIR/mitgcm/data data
-            ln_safe $FIX_DIR/bathymetry.bin .
-            ln_safe $FIX_DIR/tile001.mitgrid .
-        """
-        script = "mkOcnICBC -i $input_dir --nx $ocn_nx --ny $ocn_ny --imask $seas5_ocn_mask"
-        post-script = """
-            mv ob*.bin *_ini.bin $MEM_SHARE_DIR
-            rm -rf *
-        """
-        [[[environment]]]
-            #seas5_ocn_mask
-            #input_dir
-
-    [[mkOcnICBC<mem>]]
-        inherit = MK_OCN_ICBC, ENSMEMBER
+            wrflowinp_interval=$(( interval_seconds/60 ))
 
     [[UNGRIB]]
         pre-script = """
@@ -145,11 +140,12 @@
         """
         script = """
             ./ungrib/ungrib.exe
+            cat ungrib.log
             grep "Successful completion" ungrib.log
         """
         post-script = """
             mv FILE* $MEM_SHARE_DIR
-            rm -rf *
+            # rm -rf *
         """
         [[[environment]]]
             ungrib_dir=$SKRIPS_DIR/external/WPS/ungrib
@@ -164,10 +160,11 @@
             ln -sf $MEM_SHARE_DIR/FILE* .
             envsub $PARM_DIR/wps/namelist.wps namelist.wps
             ln_safe $metgrid_dir .
-            ln_safe $FIX_DIR/geo_em.d01.nc geo_em.d01.nc
+            ln_safe $FIX_DIR/{{atm_res}}/geo_em.d01_mod.nc geo_em.d01.nc
         """
         script = """
             ./metgrid/metgrid.exe
+            cat metgrid.log
             grep "Successful completion" metgrid.log
         """
         post-script = """
@@ -204,6 +201,116 @@
     [[real<mem>]]
         inherit = REAL, ENSMEMBER
 
+    [[ONLY_WRF]]
+        inherit = None, WRF
+        pre-script = """
+            rm -rf *
+            ln -sf $MEM_SHARE_DIR/wrf*_d?? .
+            cp -f $em_real_dir/* .
+            ln_safe $FIX_DIR/{{atm_res}}/geo_em.d01_mod.nc geo_em.d01.nc
+            source grid_info_wrf.sh geo_em.d01.nc
+            envsuball $PARM_DIR/wrf/*
+        """
+
+        script = "$run_cmd $wrf_exe"
+
+        post-script = """
+            mv *_d??_????-??-??_* $MEM_SHARE_DIR
+            rm -rf *
+        """
+        [[[environment]]]
+            atmDt={{ atmDt }}
+            em_real_dir=$SKRIPS_DIR/external/WRF/test/em_real
+            wrf_exe=$SKRIPS_DIR/external/WRF/main/wrf.exe
+            #run_cmd = site specific run command: e.g. mpirun -n 4
+            #cpuATM = site specific
+
+    [[only_wrf<mem>]]
+        inherit = ONLY_WRF, ENSMEMBER
+
+    [[UPP]]
+        pre-script = "ln -sf $MEM_SHARE_DIR/wrf3d_d01_????-??-??_* ."
+        script = "upp.sh $prefixes"
+        post-script = """
+            mkdir -p $OUTDIR
+            mv *.grb2 $OUTDIR
+            rm -rf *
+        """
+        [[[environment]]]
+            # run_cmd = site specific run command: e.g. "srun --exclusive --mem-per-cpu=2G --ntasks=16 "
+            # max_par_jobs=10
+            prefixes="wrf3d"
+    [[upp<mem>]]
+        inherit = UPP, ENSMEMBER
+
+    [[VAR_SPLIT_WRF2d]]
+        script = "varSplitWrf.sh -p wrf2d_ $MEM_SHARE_DIR/wrf2d_d01_????-??-??_*"
+        post-script = """
+            mkdir -p $OUTDIR
+            mv wrf2d_*.nc $OUTDIR
+            rm -rf *
+        """
+
+    [[varSplitWRF2d<mem>]]
+        inherit = VAR_SPLIT_WRF2d, ENSMEMBER
+
+    [[ARCHIVE]]
+        script = """
+        cd $MEM_SHARE_DIR
+        mkdir -p $MEM_ARCHIVE_DIR
+        rsync -av archive/* $MEM_ARCHIVE_DIR
+        """
+
+    [[archive<mem>]]
+        inherit = ARCHIVE, ENSMEMBER
+
+    [[CLEANUP]]
+        script = """
+        rm -rf $MEM_SHARE_DIR
+        """ #TODO: This is risky, archive directory shouldn't be inside share
+
+    [[cleanUp<mem>]]
+        inherit = CLEANUP, ENSMEMBER
+
+    [[cleanAll]]
+        script = """
+        rm -rf $CYCLE_DIR
+        """ #TODO: This is risky, archive directory shouldn't be inside share
+
+
+{% if not only_wrf %}
+    [[MITGCM]]
+        [[[environment]]]
+            ocn_nx=800
+            ocn_ny=780
+            endTime=$(isodatetime --as-total=s {{ FCSTDURATION }} )
+            deltaT={{ ocnDt }}
+            ocn2dFreq=86400 # daily
+            ocn3dFreq=432000 # 5 day
+            cpuOCN={{ cpuOCN }}
+            pickupSuff="' '"
+
+    [[MK_OCN_ICBC]]
+        inherit = None, MITGCM
+        pre-script = """
+            rm -rf *
+            envsub $PARM_DIR/mitgcm/data data
+            ln_safe $FIX_DIR/bathymetry.bin .
+            ln_safe $FIX_DIR/tile001.mitgrid .
+        """
+        script = "mkOcnICBC -i $input_dir --nx $ocn_nx --ny $ocn_ny --imask $seas5_ocn_mask"
+        post-script = """
+            mv ob*.bin *_ini.bin $MEM_SHARE_DIR
+            rm -rf *
+        """
+        [[[environment]]]
+            #seas5_ocn_mask
+            #input_dir
+
+    [[mkOcnICBC<mem>]]
+        inherit = MK_OCN_ICBC, ENSMEMBER
+
+
     [[MITGCM_BAL]]
         inherit = None, MITGCM
         pre-script="""
@@ -239,8 +346,9 @@
             ln -sf $MEM_SHARE_DIR/wrf*_d?? .
             cp -f $em_real_dir/* .
             ln_safe $FIX_DIR/bathymetry.bin .
-            ln_safe $FIX_DIR/geo_em.d01.nc .
             ln_safe $FIX_DIR/tile001.mitgrid .
+            ln_safe $FIX_DIR/{{atm_res}}/geo_em.d01_mod.nc geo_em.d01.nc
+            source grid_info_wrf.sh geo_em.d01.nc
             envsuball $PARM_DIR/wrf/*
             envsuball $PARM_DIR/mitgcm/*
             envsuball $PARM_DIR/cpld/*
@@ -269,58 +377,6 @@
     [[skrips<mem>]]
         inherit = SKRIPS, ENSMEMBER
 
-    [[WRF_ONLY]]
-        inherit = None, WRF
-        pre-script = """
-            rm -rf *
-            ln -sf $MEM_SHARE_DIR/wrf*_d?? .
-            cp -f $em_real_dir/* .
-            ln_safe $FIX_DIR/geo_em.d01.nc .
-            envsuball $PARM_DIR/wrf/*
-        """
-
-        script = "$run_cmd $wrf_exe"
-
-        post-script = """
-            mv *_d??_????-??-??_* $MEM_SHARE_DIR
-            rm -rf *
-        """
-        [[[environment]]]
-            atmDt={{ atmDt }}
-            em_real_dir=$SKRIPS_DIR/external/WRF/test/em_real
-            wrf_exe=$SKRIPS_DIR/external/WRF/main/wrf.exe
-            #run_cmd = site specific run command: e.g. mpirun -n 4
-            #cpuATM = site specific
-
-    [[wrfOnly<mem>]]
-        inherit = WRF_ONLY, ENSMEMBER
-
-    [[UPP]]
-        pre-script = "ln -sf $MEM_SHARE_DIR/wrf3d_d01_????-??-??_* ."
-        script = "upp.sh $prefixes"
-        post-script = """
-            mkdir -p $OUTDIR
-            mv *.grb2 $OUTDIR
-            rm -rf *
-        """
-        [[[environment]]]
-            # run_cmd = site specific run command: e.g. "srun --exclusive --mem-per-cpu=2G --ntasks=16 "
-            # max_par_jobs=10
-            prefixes="wrf3d"
-    [[upp<mem>]]
-        inherit = UPP, ENSMEMBER
-
-    [[VAR_SPLIT_WRF2d]]
-        script = "varSplitWrf.sh -p wrf2d_ $MEM_SHARE_DIR/wrf2d_d01_????-??-??_*"
-        post-script = """
-            mkdir -p $OUTDIR
-            mv wrf2d_*.nc $OUTDIR
-            rm -rf *
-        """
-
-    [[varSplitWRF2d<mem>]]
-        inherit = VAR_SPLIT_WRF2d, ENSMEMBER
-
     [[MITGCM2NC]]
         inherit = None, MITGCM
         pre-script = """
@@ -343,27 +399,7 @@
     [[mitgcm2nc<mem>]]
         inherit = MITGCM2NC, ENSMEMBER
 
-    [[ARCHIVE]]
-        script = """
-        cd $MEM_SHARE_DIR
-        mkdir -p $MEM_ARCHIVE_DIR
-        rsync -av archive/* $MEM_ARCHIVE_DIR
-        """
+{% endif %}
 
-    [[archive<mem>]]
-        inherit = ARCHIVE, ENSMEMBER
-
-    [[CLEANUP]]
-        script = """
-        rm -rf $MEM_SHARE_DIR
-        """ #TODO: This is risky, archive directory shouldn't be inside share
-
-    [[cleanUp<mem>]]
-        inherit = CLEANUP, ENSMEMBER
-
-    [[cleanAll]]
-        script = """
-        rm -rf $CYCLE_DIR
-        """ #TODO: This is risky, archive directory shouldn't be inside share
 
 {% include 'include/' ~ SITE ~ '/flow.cylc' %}

@@ -1,0 +1,9 @@
+{% set SITE='kaust' %}
+{% set ARCHIVE_ROOT = '/scratch/athippp/cylc-archive' %}
+{% set SKRIPS_DIR = '/scratch/athippp/iops/SKRIPS' %}
+{% set FIX_DIR = '/project/k10035/athippp/SKRIP_Grids/AP/4km' %}
+{% set DATA_DIR = '/project/k10035/athippp/DATA' %}
+{% set CONDA_CMD = '/scratch/athippp/iops/bin/micromamba' %}
+{% set account = 'k10021' %}
+{% set PKG_INSTALL_ROOT = '/scratch/athippp/iops/micromamba/envs/ap84SeasRF' %}
+{% set use_shared_partition = False %}
