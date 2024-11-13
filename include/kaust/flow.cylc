@@ -3,8 +3,13 @@
 {% set cpuPerNode=192 %}
 {% set nio_groups=6 %}
 {% set nio_tasks_per_group=8 %}
-{% set nproc_x=40 %}
-{% set nproc_y=38 %}
+{% if atm_res == '8km' %}
+    {% set nproc_x=40 %}
+    {% set nproc_y=38 %}
+{% elif atm_res == '4km' %}
+    {% set nproc_x=80 %}
+    {% set nproc_y=76 %}
+{% endif %}
 
 {% set cpuATM = nio_groups * nio_tasks_per_group + nproc_x * nproc_y  %}
 
