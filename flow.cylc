@@ -4,6 +4,7 @@
 {% from 'site.cylc' import ARCHIVE_ROOT, SKRIPS_DIR, DATA_DIR, FIX_DIR %}
 
 {% from 'param.cylc' import initialCyclePoint, NMEMBERS, cycle, only_wrf, install_pkgs, atmDt, FCSTDURATION, atm_res %}
+{% from 'param.cylc' import spectral_nudging %}
 
 {% if cycle != 'R1' %}
 {% from 'site.cylc' import finalCyclePoint %}
@@ -102,8 +103,13 @@
             interval_seconds = 43200 # boundary forcing interval for wrf
             {% if atm_res == "4km" %}
                 cu_physics = 0
-            {% else %}
+            {% elif atm_res == "8km" %}
                 cu_physics = 1
+            {% endif %}
+
+            grid_fdda = 0
+            {% if spectral_nudging %}
+                grid_fdda = 2
             {% endif %}
 
     [[installMambaPkgs]]

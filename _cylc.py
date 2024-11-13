@@ -54,6 +54,13 @@ def return_defaults(key, x):
 
 config = [
     {
+        "name": "run_name_prefix",
+        "type": "text",
+        "default": set_default("run_name_prefix", ""),
+        "message": "Set the run name prefix",
+        "when": lambda x: not return_defaults("run_name_prefix", x),
+    },
+    {
         "name": "only_wrf",
         "type": "confirm",
         "default": set_default("only_wrf", False),
@@ -117,6 +124,13 @@ config = [
         "message": "Set the atmospheric time step (atmDt) in seconds",
         "filter": int,
         "when": lambda x: not return_defaults("atmDt", x),
+    },
+    {
+        "name": "spectral_nudging",
+        "type": "confirm",
+        "default": set_default("spectral_nudging", True),
+        "message": "Turn on spectral nudging?",
+        "when": lambda x: not return_defaults("spectral_nudging", x),
     },
     {
         "name": "ocnDt",
@@ -186,9 +200,11 @@ def main(cmd: CylcCommands, ans: str = "", defaults: bool = False):
 
 
 def create_workflow_name(answers):
-    wname = "CPLD"
+    wname = answers["run_name_prefix"]
     if answers["only_wrf"]:
-        wname = "WRF"
+        wname += "WRF"
+    else:
+        wname += "CPLD"
     wrf_res = answers["atm_res"]
     wname += wrf_res
     wname += "SEAS_H"

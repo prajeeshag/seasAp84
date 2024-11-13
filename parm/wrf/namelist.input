@@ -97,7 +97,7 @@ io_form_auxhist6                    = 2,
  /
 
  &fdda
- grid_fdda                           = 2
+ grid_fdda                           = ${grid_fdda}
  xwavenum                            = 9
  ywavenum                            = 9
  gfdda_inname                        = "wrffdda_d<domain>",
